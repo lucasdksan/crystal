@@ -4,7 +4,6 @@ const { runSom } = require("./som");
 
 function normalize(vectors) {
     const cols = vectors[0].length;
-
     const mins = Array(cols).fill(Infinity);
     const maxs = Array(cols).fill(-Infinity);
 
@@ -121,15 +120,12 @@ async function main() {
     const headers = {
         "Content-Type": "application/json",
         "X-VTEX-API-AppKey": "vtexappkey-agencian1-HRURPP",
-        "X-VTEX-API-AppToken":
-            "RUUWGIABQTLMDETDAJQDXLWNGJHQAPNFYECFPJFRMSSKIDIHXAUBVEEFXGQWBKAAFGNYCONRDZQETMFCBZSAVLKUAXIJSIPCSRECPJFJMDYWNZMLBNVCRAFUWTYFFEYU",
+        "X-VTEX-API-AppToken": "RUUWGIABQTLMDETDAJQDXLWNGJHQAPNFYECFPJFRMSSKIDIHXAUBVEEFXGQWBKAAFGNYCONRDZQETMFCBZSAVLKUAXIJSIPCSRECPJFJMDYWNZMLBNVCRAFUWTYFFEYU",
     };
 
     const data = await fetch("https://agencian1.myvtex.com/api/oms/pvt/orders?_items=1", { headers });
     const json = await data.json();
     const { list } = json;
-
-    console.log(JSON.stringify(list[0], null, 2));
 
     if (!list || list.length === 0) {
         console.log("Nenhum pedido encontrado.");
@@ -139,7 +135,6 @@ async function main() {
     const orders = getDataOrders(list);
     const vectors = orders.map(orderToVector);
     const normalizedVectors = normalize(vectors);
-
     const { result, elbowAnalysis, bestK } = runKmeans(normalizedVectors);
     const somResult = runSom(normalizedVectors);
 
