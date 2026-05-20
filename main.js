@@ -45,6 +45,15 @@ function getDataOrders(list) {
         Pix: 3,
         "Cartão de Crédito": 4,
         "Cartão de Débito": 5,
+        Visa: 6,
+        Mastercard: 7,
+        "American Express": 8,
+        "Diners Club": 9,
+        "Hipercard": 10,
+        Aura: 11,
+        Elo: 12,
+        JCB: 13,
+        Discover: 14,
     };
 
     const statusMap = {
@@ -59,6 +68,7 @@ function getDataOrders(list) {
         "ready-for-handling": 8,
         handling: 9,
         "window-to-cancel": 10,
+        "waiting-for-sellers-confirmation": 11,
     };
 
     const salesChannelMap = buildSalesChannelMap(list);
@@ -117,13 +127,14 @@ function orderToVector(order) {
 }
 
 async function main() {
+    const url = "https://agencian1.myvtex.com/"	
     const headers = {
         "Content-Type": "application/json",
         "X-VTEX-API-AppKey": "vtexappkey-agencian1-HRURPP",
         "X-VTEX-API-AppToken": "RUUWGIABQTLMDETDAJQDXLWNGJHQAPNFYECFPJFRMSSKIDIHXAUBVEEFXGQWBKAAFGNYCONRDZQETMFCBZSAVLKUAXIJSIPCSRECPJFJMDYWNZMLBNVCRAFUWTYFFEYU",
     };
 
-    const data = await fetch("https://agencian1.myvtex.com/api/oms/pvt/orders?_items=1", { headers });
+    const data = await fetch(`${url}api/oms/pvt/orders?_items=1`, { headers });
     const json = await data.json();
     const { list } = json;
 
