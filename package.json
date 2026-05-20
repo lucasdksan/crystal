@@ -1,0 +1,26 @@
+{
+  "name": "crystal",
+  "version": "1.0.0",
+  "description": "Projeto pessoal para fazer analises de performace em e-commerces usando machine learning",
+  "main": "main.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node main.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lucasdksan/crystal.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/lucasdksan/crystal/issues"
+  },
+  "homepage": "https://github.com/lucasdksan/crystal#readme",
+  "dependencies": {
+    "ml-kmeans": "^7.0.0",
+    "ml-som": "^0.0.6"
+  }
+}
