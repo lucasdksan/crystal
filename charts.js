@@ -12,6 +12,15 @@ const PAYMENT_LABELS = {
     3: "Pix",
     4: "Cartão de Crédito",
     5: "Cartão de Débito",
+    6: "Visa",
+    7: "Mastercard",
+    8: "American Express",
+    9: "Diners Club",
+    10: "Hipercard",
+    11: "Aura",
+    12: "Elo",
+    13: "JCB",
+    14: "Discover",
     "-1": "Desconhecido",
 };
 
@@ -489,7 +498,92 @@ function getSeverityClass(severity) {
     return "severity-low";
 }
 
-function buildDiagnosticsHtml({ diagnosis, risks, kits }) {
+function formatScorePercent(score) {
+    return `${Math.round(score * 100)}%`;
+}
+
+function buildScoreBar(label, score, barClass) {
+    const percent = Math.round(score * 100);
+
+    return `
+        <div class="score-bar-row">
+            <span class="score-bar-label">${label}</span>
+            <div class="score-bar-track">
+                <div class="score-bar-fill ${barClass}" style="width: ${percent}%"></div>
+            </div>
+            <span class="score-bar-value">${percent}%</span>
+        </div>
+    `;
+}
+
+function buildKitCardsHtml(kits) {
+    if (!kits || kits.length === 0) {
+        return "";
+    }
+
+    return `
+        <div class="strategy-kits">
+            <span class="strategy-kits-title">Kits sugeridos</span>
+            <div class="kits-grid">
+                ${kits
+                    .map(
+                        (kit) => `
+                    <div class="kit-card">
+                        <h4>${kit.commercialName}</h4>
+                        <p class="kit-objective"><strong>Objetivo:</strong> ${kit.strategicObjective}</p>
+                        <ul class="kit-items">
+                            ${kit.compositeItems.map((item) => `<li>${item}</li>`).join("")}
+                        </ul>
+                        <p class="kit-rationale">${kit.salesRationale}</p>
+                    </div>
+                `
+                    )
+                    .join("")}
+            </div>
+        </div>
+    `;
+}
+
+function buildStrategyCard(strategy) {
+    const justificationsHtml = strategy.justifications
+        .map((text) => `<li>${text}</li>`)
+        .join("");
+    const actionsHtml = strategy.actions
+        .map(
+            (action) => `
+            <div class="strategy-action">
+                <strong>${action.label}</strong>
+                <p>${action.description}</p>
+            </div>
+        `
+        )
+        .join("");
+    const kitsHtml = buildKitCardsHtml(strategy.kits);
+
+    return `
+        <div class="strategy-card">
+            <div class="strategy-header">
+                <h3>${strategy.label}</h3>
+                <span class="strategy-type-badge">${strategy.type}</span>
+            </div>
+            <div class="strategy-scores">
+                ${buildScoreBar("Confiança", strategy.confidenceScore, "score-confidence")}
+                ${buildScoreBar("Impacto", strategy.impactScore, "score-impact")}
+                ${buildScoreBar("Risco", strategy.riskScore, "score-risk")}
+            </div>
+            <div class="strategy-score-badges">
+                <span class="score-badge score-badge-confidence">Confiança ${formatScorePercent(strategy.confidenceScore)}</span>
+                <span class="score-badge score-badge-impact">Impacto ${formatScorePercent(strategy.impactScore)}</span>
+                <span class="score-badge score-badge-risk">Risco ${formatScorePercent(strategy.riskScore)}</span>
+            </div>
+            <ul class="strategy-justifications">${justificationsHtml}</ul>
+            <div class="strategy-actions">${actionsHtml}</div>
+            ${kitsHtml}
+        </div>
+    `;
+}
+
+function buildDiagnosticsHtml({ diagnosis, risks, strategies }) {
     const dependencyBadge = diagnosis.excessiveDependency
         ? '<span class="badge badge-warning">Dependência excessiva</span>'
         : '<span class="badge badge-success">Portfólio diversificado</span>';
@@ -509,29 +603,16 @@ function buildDiagnosticsHtml({ diagnosis, risks, kits }) {
                   .join("")
             : `<tr><td colspan="3" class="empty-row">Nenhum risco identificado com os critérios atuais.</td></tr>`;
 
-    const kitsHtml =
-        kits.length > 0
-            ? kits
-                  .map(
-                      (kit) => `
-            <div class="kit-card">
-                <h3>${kit.commercialName}</h3>
-                <p class="kit-objective"><strong>Objetivo:</strong> ${kit.strategicObjective}</p>
-                <ul class="kit-items">
-                    ${kit.compositeItems.map((item) => `<li>${item}</li>`).join("")}
-                </ul>
-                <p class="kit-rationale">${kit.salesRationale}</p>
-            </div>
-        `
-                  )
-                  .join("")
-            : `<p class="empty-row">Nenhuma sugestão de kit gerada para o portfólio atual.</p>`;
+    const strategiesHtml =
+        strategies.length > 0
+            ? strategies.map((strategy) => buildStrategyCard(strategy)).join("")
+            : `<p class="empty-row">Nenhuma estratégia gerada para o portfólio atual.</p>`;
 
     return `
         <div class="card diagnostics-card">
             <h2>Diagnóstico Estratégico</h2>
             <p class="table-description">
-                Análise determinística baseada em taxas de cancelamento, volume de vendas e concentração do portfólio.
+                Recomendações contextualizadas por scores de risco, dependência, saúde do portfólio e afinidade de bundle — sem sugestões fixas de kit.
             </p>
 
             <div class="diagnostic-summary">
@@ -563,8 +644,8 @@ function buildDiagnosticsHtml({ diagnosis, risks, kits }) {
                 </table>
             </div>
 
-            <h3 class="subsection-title">Sugestões de Kits</h3>
-            <div class="kits-grid">${kitsHtml}</div>
+            <h3 class="subsection-title">Estratégias Recomendadas</h3>
+            <div class="strategies-grid">${strategiesHtml}</div>
         </div>
     `;
 }
@@ -911,6 +992,143 @@ function buildHtml({
             background: rgba(34, 197, 94, 0.2);
             color: rgb(34, 197, 94);
         }
+        .strategies-grid {
+            display: flex;
+            flex-direction: column;
+            gap: 1.25rem;
+        }
+        .strategy-card {
+            padding: 1.25rem;
+            background: rgba(15, 23, 42, 0.45);
+            border-radius: 8px;
+            border: 1px solid rgba(148, 163, 184, 0.15);
+        }
+        .strategy-header {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: center;
+            justify-content: space-between;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .strategy-header h3 {
+            font-size: 1rem;
+            color: #f8fafc;
+            margin: 0;
+        }
+        .strategy-type-badge {
+            font-size: 0.7rem;
+            padding: 0.2rem 0.5rem;
+            border-radius: 4px;
+            background: rgba(99, 102, 241, 0.2);
+            color: rgb(165, 180, 252);
+            font-family: monospace;
+        }
+        .strategy-scores {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+            margin-bottom: 0.75rem;
+        }
+        .score-bar-row {
+            display: grid;
+            grid-template-columns: 90px 1fr 40px;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.8rem;
+        }
+        .score-bar-label {
+            color: #94a3b8;
+        }
+        .score-bar-track {
+            height: 8px;
+            background: rgba(148, 163, 184, 0.15);
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        .score-bar-fill {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s ease;
+        }
+        .score-bar-fill.score-confidence {
+            background: rgb(99, 102, 241);
+        }
+        .score-bar-fill.score-impact {
+            background: rgb(34, 197, 94);
+        }
+        .score-bar-fill.score-risk {
+            background: rgb(239, 68, 68);
+        }
+        .score-bar-value {
+            color: #cbd5e1;
+            text-align: right;
+        }
+        .strategy-score-badges {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.5rem;
+            margin-bottom: 1rem;
+        }
+        .score-badge {
+            font-size: 0.75rem;
+            padding: 0.25rem 0.6rem;
+            border-radius: 999px;
+            font-weight: 600;
+        }
+        .score-badge-confidence {
+            background: rgba(99, 102, 241, 0.2);
+            color: rgb(165, 180, 252);
+        }
+        .score-badge-impact {
+            background: rgba(34, 197, 94, 0.2);
+            color: rgb(74, 222, 128);
+        }
+        .score-badge-risk {
+            background: rgba(239, 68, 68, 0.2);
+            color: rgb(248, 113, 113);
+        }
+        .strategy-justifications {
+            margin: 0 0 1rem 1.25rem;
+            font-size: 0.85rem;
+            color: #94a3b8;
+            line-height: 1.5;
+        }
+        .strategy-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+        .strategy-action {
+            padding: 0.75rem;
+            background: rgba(30, 41, 59, 0.5);
+            border-radius: 6px;
+        }
+        .strategy-action strong {
+            display: block;
+            font-size: 0.85rem;
+            color: #e2e8f0;
+            margin-bottom: 0.25rem;
+        }
+        .strategy-action p {
+            font-size: 0.8rem;
+            color: #94a3b8;
+            margin: 0;
+            line-height: 1.4;
+        }
+        .strategy-kits {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid rgba(148, 163, 184, 0.15);
+        }
+        .strategy-kits-title {
+            display: block;
+            font-size: 0.75rem;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin-bottom: 0.75rem;
+        }
         .kits-grid {
             display: grid;
             grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
@@ -922,8 +1140,8 @@ function buildHtml({
             border-radius: 8px;
             border: 1px solid rgba(148, 163, 184, 0.15);
         }
-        .kit-card h3 {
-            font-size: 0.95rem;
+        .kit-card h4 {
+            font-size: 0.9rem;
             color: #f8fafc;
             margin-bottom: 0.5rem;
         }
@@ -1482,8 +1700,8 @@ function generateReport({ orders, rawList, result, elbowAnalysis, bestK, somResu
     const tableRows = buildClusterTable(groups, orders.length, result.centroids, overallAvgValue);
     const insights = buildClusterInsights(tableRows, overallAvgValue);
     const summary = buildSummary(orders.length, Object.keys(groups).length, bestK);
-    const { diagnosis, risks, kits } = buildDiagnostics(rawList);
-    const diagnosticsHtml = buildDiagnosticsHtml({ diagnosis, risks, kits });
+    const { diagnosis, risks, strategies } = buildDiagnostics(rawList);
+    const diagnosticsHtml = buildDiagnosticsHtml({ diagnosis, risks, strategies });
 
     const somHeatmapData = buildSomHeatmapData(
         somResult.predictions,
@@ -1517,7 +1735,9 @@ function generateReport({ orders, rawList, result, elbowAnalysis, bestK, somResu
     fs.writeFileSync(reportPath, html, "utf-8");
 
     console.log("\nDiagnóstico estratégico:");
-    console.log(JSON.stringify({ diagnosis, identifiedRisks: risks, kitSuggestions: kits }, null, 2));
+    console.log(
+        JSON.stringify({ diagnosis, identifiedRisks: risks, strategies }, null, 2)
+    );
 
     console.log(`\nRelatório gerado em: ${reportPath}`);
     openReport(reportPath);
