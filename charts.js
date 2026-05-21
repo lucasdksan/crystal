@@ -226,12 +226,12 @@ function buildTopProducts(rawList, limit = 10) {
     };
 }
 
-function buildSilhouetteData(silhouetteAnalysis, bestK) {
+function buildElbowData(elbowAnalysis, bestK) {
     return {
-        labels: silhouetteAnalysis.map((item) => `K=${item.k}`),
-        scores: silhouetteAnalysis.map((item) => item.score),
+        labels: elbowAnalysis.map((item) => `K=${item.k}`),
+        scores: elbowAnalysis.map((item) => item.wcss),
         bestK,
-        bestKIndex: silhouetteAnalysis.findIndex((item) => item.k === bestK),
+        bestKIndex: elbowAnalysis.findIndex((item) => item.k === bestK),
     };
 }
 
@@ -771,7 +771,7 @@ function buildHtml({
     ordersByDay,
     statusDistribution,
     topProducts,
-    silhouetteData,
+    elbowData,
     insights,
     diagnosticsHtml,
     somHtml,
@@ -1269,9 +1269,9 @@ function buildHtml({
 
     <div class="grid">
         <div class="card">
-            <h2>Silhouette Score por K</h2>
+            <h2>Método do Cotovelo (WCSS) por K</h2>
             <div class="chart-container">
-                <canvas id="silhouetteChart"></canvas>
+                <canvas id="elbowChart"></canvas>
             </div>
         </div>
         <div class="card">
@@ -1345,29 +1345,29 @@ function buildHtml({
         const ordersByDay = ${JSON.stringify(ordersByDay)};
         const statusDistribution = ${JSON.stringify(statusDistribution)};
         const topProducts = ${JSON.stringify(topProducts)};
-        const silhouetteData = ${JSON.stringify(silhouetteData)};
+        const elbowData = ${JSON.stringify(elbowData)};
 
         const currencyFormatter = new Intl.NumberFormat("pt-BR", {
             style: "currency",
             currency: "BRL",
         });
 
-        new Chart(document.getElementById("silhouetteChart"), {
+        new Chart(document.getElementById("elbowChart"), {
             type: "line",
             data: {
-                labels: silhouetteData.labels,
+                labels: elbowData.labels,
                 datasets: [{
-                    label: "Silhouette",
-                    data: silhouetteData.scores,
+                    label: "WCSS",
+                    data: elbowData.scores,
                     borderColor: "rgb(99, 102, 241)",
                     backgroundColor: "rgba(99, 102, 241, 0.15)",
                     fill: true,
                     tension: 0.3,
-                    pointRadius: silhouetteData.labels.map((_, index) =>
-                        index === silhouetteData.bestKIndex ? 7 : 4
+                    pointRadius: elbowData.labels.map((_, index) =>
+                        index === elbowData.bestKIndex ? 7 : 4
                     ),
-                    pointBackgroundColor: silhouetteData.labels.map((_, index) =>
-                        index === silhouetteData.bestKIndex ? "rgb(251, 146, 60)" : "rgb(99, 102, 241)"
+                    pointBackgroundColor: elbowData.labels.map((_, index) =>
+                        index === elbowData.bestKIndex ? "rgb(251, 146, 60)" : "rgb(99, 102, 241)"
                     ),
                 }],
             },
@@ -1379,7 +1379,7 @@ function buildHtml({
                     tooltip: {
                         callbacks: {
                             afterLabel(context) {
-                                if (context.dataIndex === silhouetteData.bestKIndex) {
+                                if (context.dataIndex === elbowData.bestKIndex) {
                                     return "K selecionado automaticamente";
                                 }
                                 return "";
@@ -1393,9 +1393,7 @@ function buildHtml({
                         grid: { color: "rgba(148, 163, 184, 0.1)" },
                     },
                     y: {
-                        title: { display: true, text: "Score", color: "#94a3b8" },
-                        min: -1,
-                        max: 1,
+                        title: { display: true, text: "WCSS", color: "#94a3b8" },
                         ticks: { color: "#94a3b8" },
                         grid: { color: "rgba(148, 163, 184, 0.1)" },
                     },
@@ -1685,7 +1683,7 @@ function openReport(filePath) {
     });
 }
 
-function generateReport({ orders, rawList, result, silhouetteAnalysis, bestK, somResult }) {
+function generateReport({ orders, rawList, result, elbowAnalysis, bestK, somResult }) {
     const groups = groupOrdersByCluster(orders, result.clusters);
     const overallAvgValue =
         orders.reduce((acc, order) => acc + order.totalValue, 0) / (orders.length || 1);
@@ -1695,7 +1693,7 @@ function generateReport({ orders, rawList, result, silhouetteAnalysis, bestK, so
     const ordersByDay = buildOrdersByDayOfWeek(orders);
     const statusDistribution = buildStatusDistribution(rawList);
     const topProducts = buildTopProducts(rawList);
-    const silhouetteData = buildSilhouetteData(silhouetteAnalysis, bestK);
+    const elbowData = buildElbowData(elbowAnalysis, bestK);
     const scatterData = buildScatterData(groups, overallAvgValue);
     const stats = buildClusterStats(groups, overallAvgValue);
     const centroidDatasets = buildCentroidDatasets(result.centroids, groups, overallAvgValue);
@@ -1728,7 +1726,7 @@ function generateReport({ orders, rawList, result, silhouetteAnalysis, bestK, so
         ordersByDay,
         statusDistribution,
         topProducts,
-        silhouetteData,
+        elbowData,
         insights,
         diagnosticsHtml,
         somHtml,
