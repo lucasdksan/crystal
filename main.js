@@ -146,10 +146,10 @@ async function main() {
     const orders = getDataOrders(list);
     const vectors = orders.map(orderToVector);
     const normalizedVectors = normalize(vectors);
-    const { result, elbowAnalysis, bestK } = runKmeans(normalizedVectors);
+    const { result, silhouetteAnalysis, bestK } = runKmeans(normalizedVectors);
     const somResult = runSom(normalizedVectors);
 
-    console.log("Análise Elbow:", elbowAnalysis);
+    console.log("Análise Silhouette:", silhouetteAnalysis);
     console.log("K ótimo selecionado:", bestK);
 
     console.log("\nCLUSTERS:\n");
@@ -171,7 +171,7 @@ async function main() {
         orders,
         rawList: list,
         result,
-        elbowAnalysis,
+        silhouetteAnalysis,
         bestK,
         somResult,
     });
