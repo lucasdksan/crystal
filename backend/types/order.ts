@@ -28,15 +28,14 @@ export interface ProcessedOrder {
   isAllDelivered: number;
 }
 
-/** 9-dimensional feature vector used for clustering */
 export type FeatureVector = [
-  number, // totalValue
-  number, // totalItems
-  number, // totalQuantity
-  number, // avgPrice
-  number, // origin
-  number, // paymentNames
-  number, // hourOfDay
-  number, // dayOfWeek
-  number, // salesChannel
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
+  number,
 ];
