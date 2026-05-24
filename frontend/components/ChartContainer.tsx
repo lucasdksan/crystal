@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import { ResponsiveContainer } from "recharts";
 
 interface ChartContainerProps {
@@ -14,27 +14,54 @@ export function ChartContainer({
   className = "",
   height,
 }: ChartContainerProps) {
-  const [mounted, setMounted] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState<{
+    width: number;
+    height: number;
+  } | null>(null);
 
   useEffect(() => {
-    setMounted(true);
-  }, []);
+    const element = containerRef.current;
+    if (!element) return;
 
-  if (!mounted) {
-    return (
-      <div
-        className={`w-full min-w-0 ${className}`}
-        style={{ height }}
-        aria-hidden
-      />
-    );
-  }
+    const measure = () => {
+      const { width, height: measuredHeight } = element.getBoundingClientRect();
+      const nextWidth = Math.floor(width);
+      const nextHeight = Math.floor(measuredHeight);
+
+      if (nextWidth > 0 && nextHeight > 0) {
+        setDimensions((prev) =>
+          prev?.width === nextWidth && prev?.height === nextHeight
+            ? prev
+            : { width: nextWidth, height: nextHeight },
+        );
+      }
+    };
+
+    measure();
+
+    const observer = new ResizeObserver(measure);
+    observer.observe(element);
+
+    return () => observer.disconnect();
+  }, [height]);
 
   return (
-    <div className={`w-full min-w-0 ${className}`} style={{ height }}>
-      <ResponsiveContainer width="100%" height="100%" minWidth={0}>
-        {children}
-      </ResponsiveContainer>
+    <div
+      ref={containerRef}
+      className={`relative w-full min-w-0 shrink-0 ${className}`}
+      style={{ height }}
+    >
+      {dimensions ? (
+        <ResponsiveContainer
+          width={dimensions.width}
+          height={dimensions.height}
+          minWidth={0}
+          minHeight={0}
+        >
+          {children}
+        </ResponsiveContainer>
+      ) : null}
     </div>
   );
 }
