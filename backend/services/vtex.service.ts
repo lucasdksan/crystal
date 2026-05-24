@@ -1,5 +1,21 @@
 import type { VtexOrder, VtexOrdersResponse } from "@/backend/types/vtex";
 
+function centsToCurrency(value: number): number {
+  return value / 100;
+}
+
+function normalizeOrderMonetaryValues(order: VtexOrder): VtexOrder {
+  return {
+    ...order,
+    totalValue: centsToCurrency(order.totalValue),
+    items: order.items.map((item) => ({
+      ...item,
+      price: centsToCurrency(item.price),
+      sellingPrice: centsToCurrency(item.sellingPrice),
+    })),
+  };
+}
+
 function getVtexConfig() {
   const baseUrl = process.env.VTEX_BASE_URL;
   const appKey = process.env.VTEX_APP_KEY;
@@ -20,11 +36,6 @@ function getVtexConfig() {
 
 export async function fetchVtexOrders(): Promise<VtexOrder[]> {
   const { baseUrl, appKey, appToken } = getVtexConfig();
-
-  console.log("baseUrl", baseUrl);
-  console.log("appKey", appKey);
-  console.log("appToken", appToken);
-
   const response = await fetch(`${baseUrl}api/oms/pvt/orders?_items=1`, {
     headers: {
       "Content-Type": "application/json",
@@ -46,5 +57,5 @@ export async function fetchVtexOrders(): Promise<VtexOrder[]> {
     throw new Error("Nenhum pedido encontrado.");
   }
 
-  return json.list;
+  return json.list.map(normalizeOrderMonetaryValues);
 }
