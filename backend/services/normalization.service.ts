@@ -103,9 +103,13 @@ export function orderToVector(order: ProcessedOrder): FeatureVector {
   ];
 }
 
-export function normalize(vectors: number[][]): number[][] {
+export function normalize(vectors: number[][]): {
+  normalized: number[][];
+  mins: number[];
+  maxs: number[];
+} {
   if (vectors.length === 0) {
-    return [];
+    return { normalized: [], mins: [], maxs: [] };
   }
 
   const cols = vectors[0].length;
@@ -119,7 +123,7 @@ export function normalize(vectors: number[][]): number[][] {
     });
   });
 
-  return vectors.map((row) =>
+  const normalized = vectors.map((row) =>
     row.map((value, i) => {
       const range = maxs[i] - mins[i];
 
@@ -130,14 +134,18 @@ export function normalize(vectors: number[][]): number[][] {
       return (value - mins[i]) / range;
     }),
   );
+
+  return { normalized, mins, maxs };
 }
 
 export function buildFeatureVectors(orders: ProcessedOrder[]): {
   rawVectors: FeatureVector[];
   normalizedVectors: number[][];
+  mins: number[];
+  maxs: number[];
 } {
   const rawVectors = orders.map(orderToVector);
-  const normalizedVectors = normalize(rawVectors);
+  const { normalized, mins, maxs } = normalize(rawVectors);
 
-  return { rawVectors, normalizedVectors };
+  return { rawVectors, normalizedVectors: normalized, mins, maxs };
 }
