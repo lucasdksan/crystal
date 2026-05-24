@@ -5,10 +5,17 @@ export interface ElbowPoint {
   wcss: number;
 }
 
+export interface SilhouettePoint {
+  k: number;
+  score: number;
+}
+
 export interface KmeansResult {
   clusters: number[];
   centroids: number[][];
+  orderDistances: number[];
   elbowAnalysis: ElbowPoint[];
+  silhouetteAnalysis: SilhouettePoint[];
   bestK: number;
 }
 
@@ -16,6 +23,13 @@ export interface SomResult {
   predictions: [number, number][];
   gridX: number;
   gridY: number;
+}
+
+export interface ProductKmeansResult {
+  productKeys: string[];
+  clusters: number[];
+  distances: number[];
+  bestK: number;
 }
 
 export interface ProductStat {
@@ -103,11 +117,18 @@ export interface DiagnosticsResult {
   portfolioScores: PortfolioScores;
 }
 
+export interface NormalizationMeta {
+  mins: number[];
+  maxs: number[];
+}
+
 export interface AnalysisResult {
   orders: ProcessedOrder[];
   kmeans: KmeansResult;
   som: SomResult;
+  productKmeans: ProductKmeansResult;
   diagnostics: DiagnosticsResult;
+  normalizationMeta: NormalizationMeta;
 }
 
 export interface AnalysisError {
