@@ -181,7 +181,6 @@ function generateClusterDescription(
         ? ` Representa ${revenueShare.toFixed(1)}% da receita do lote.`
         : "";
 
-  // Group is healthy: high delivery rate, low cancellation
   if (deliveryRate > 50 || (cancelRate < 15 && deliveryRate >= 0)) {
     if (cancelRate < 15 && deliveryRate > 50) {
       const timingHint =
@@ -190,7 +189,6 @@ function generateClusterDescription(
           : "";
       return `Grupo saudável! Pagamento via ${payment} com ${deliveryRate.toFixed(0)}% de entrega. Ticket médio R$ ${avgFormatted}.${timingHint} Replique este padrão!`;
     }
-    // Pending dispatch (not yet delivered, but also not canceled)
     if (cancelRate < 15) {
       const timingHint =
         peakDay && peakHour !== undefined
@@ -200,7 +198,6 @@ function generateClusterDescription(
     }
   }
 
-  // High cancellation — use payment-specific messages
   if (cancelRate >= 50) {
     if (p.includes("promiss")) {
       if (count >= 3)
@@ -219,7 +216,6 @@ function generateClusterDescription(
     return `Cancelamento elevado (${cancelRate.toFixed(0)}%) em ${count} pedido(s). Ticket médio R$ ${avgFormatted}.${shareText} Investigue o padrão de comportamento deste grupo.`;
   }
 
-  // Mixed group: some delivery, some cancellation
   return `Grupo misto: ${deliveryRate.toFixed(0)}% de entrega, ${cancelRate.toFixed(0)}% de cancelamento. Ticket médio R$ ${avgFormatted}.${shareText} Monitore conversão e ajuste método de pagamento se necessário.`;
 }
 
