@@ -29,7 +29,7 @@ function buildWelcomeMessage(data: DashboardData): ChatMessage {
     id: "default",
     sender: "assistant",
     text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Estou aqui para traduzir este relatório de forma descomplicada!\n\nSua taxa de cancelamento está em **${data.overview.taxaCancelamento.toFixed(1)}%** e temos **${data.overview.totalPedidos} pedidos** analisados em **${data.overview.totalClusters} grupos** de comportamento.\n\nO que você gostaria de explorar hoje? Pode perguntar livremente ou clicar em um dos botões rápidos abaixo!`,
-    timestamp: "",
+    timestamp: formatChatTime(),
   };
 }
 
@@ -40,16 +40,6 @@ export function MentorChat({ data }: MentorChatProps) {
   const [inputVal, setInputVal] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement | null>(null);
-
-  useEffect(() => {
-    setMessages((prev) =>
-      prev.map((msg) =>
-        msg.id === "default" && !msg.timestamp
-          ? { ...msg, timestamp: formatChatTime() }
-          : msg,
-      ),
-    );
-  }, []);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -174,8 +164,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 1
               </span>
               <p>
-                Pergunte sobre conceitos complexos (como "Curva de Cotovelo" ou
-                "Mapa de Comportamento").
+                Pergunte sobre conceitos complexos (como &quot;Curva de Cotovelo&quot; ou
+                &quot;Mapa de Comportamento&quot;).
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
