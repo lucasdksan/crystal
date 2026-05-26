@@ -2,6 +2,8 @@ const { generateReport } = require("./charts");
 const { runKmeans } = require("./kmeans");
 const { runSom } = require("./som");
 
+// V1
+
 function normalize(vectors) {
     const cols = vectors[0].length;
     const mins = Array(cols).fill(Infinity);
