@@ -138,7 +138,7 @@ export function ClustersTab({ data }: ClustersTabProps) {
                   tempo de atender um por um de forma diferente.{" "}
                   A <strong>segmentação inteligente</strong> analisa a receita, o
                   número de produtos, o pagamento
-                  utilizado e o horário e, de forma mágica, "empilha" pessoas
+                  utilizado e o horário e, de forma mágica, &quot;empilha&quot; pessoas
                   com comportamentos muito parecidos em gavetas (os chamados{" "}
                   <em>Clusters</em>).
                 </p>
