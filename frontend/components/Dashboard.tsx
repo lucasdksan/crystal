@@ -913,7 +913,7 @@ export function Dashboard({ initialData }: DashboardProps) {
                 </div>
                 <div className="text-xs text-slate-500 font-sans bg-slate-50 p-2.5 rounded-lg border border-slate-100">
                   🧬 <strong>Lojista Independente:</strong> Use o botão
-                  "Importar Lote JSON" acima para subir planilhas exportadas das
+                  &quot;Importar Lote JSON&quot; acima para subir planilhas exportadas das
                   suas vendas e obter gráficos de segmentação instantâneos!
                 </div>
               </div>
