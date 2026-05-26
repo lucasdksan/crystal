@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { runAnalysis } from "@/backend/actions/analysis";
 import { mapAnalysisResultToDashboard } from "@/frontend/lib/mapper";
 import { Dashboard } from "@/frontend/components/Dashboard";
@@ -30,13 +31,13 @@ export default async function Page() {
               {result.error}
             </p>
           </div>
-          <a
+          <Link
             href="/"
             className="inline-flex items-center gap-2 px-6 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-sm font-semibold font-sans transition-colors"
           >
             <RefreshCw className="w-4 h-4" />
             Tentar Novamente
-          </a>
+          </Link>
         </div>
       </div>
     );
