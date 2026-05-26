@@ -194,7 +194,10 @@ A geração de gráficos e relatórios HTML (antigo `charts.js`) é responsabili
 ## Scripts
 
 ```bash
-npm run dev      # servidor de desenvolvimento
-npm run build    # build de produção
-npm run lint     # lint
+npm run dev           # servidor de desenvolvimento
+npm run build         # build de produção
+npm run lint          # lint
+npm run test          # roda todos os testes
+npm run test:watch    # modo interativo
+npm run test:coverage # relatório de cobertura
 ```
