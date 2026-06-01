@@ -29,6 +29,22 @@ describe("runAnalysis", () => {
     expect(response.data.normalizationMeta.mins).toHaveLength(9);
   });
 
+  it("forwards analysis options to fetchVtexOrders", async () => {
+    fetchVtexOrdersMock.mockResolvedValue(fixtureVtexOrdersNormalized());
+
+    await runAnalysis({
+      startDate: "2025-01-01T00:00:00.000Z",
+      endDate: "2025-01-31T23:59:59.999Z",
+      perPage: 50,
+    });
+
+    expect(fetchVtexOrdersMock).toHaveBeenCalledWith({
+      startDate: "2025-01-01T00:00:00.000Z",
+      endDate: "2025-01-31T23:59:59.999Z",
+      perPage: 50,
+    });
+  });
+
   it("returns an error response when VTEX fetch fails", async () => {
     fetchVtexOrdersMock.mockRejectedValue(new Error("VTEX indisponível"));
 

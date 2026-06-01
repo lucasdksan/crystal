@@ -72,6 +72,29 @@ describe("vtex.service", () => {
     await expect(fetchVtexOrders()).rejects.toThrow(/Nenhum pedido encontrado/);
   });
 
+  it("appends date filter and pagination params when options provided", async () => {
+    const fetchMock = vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ list: fixtureVtexOrdersRaw.slice(0, 2) }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    await fetchVtexOrders({
+      page: 2,
+      perPage: 50,
+      startDate: "2025-01-01T00:00:00.000Z",
+      endDate: "2025-01-31T23:59:59.999Z",
+    });
+
+    const calledUrl = decodeURIComponent(String(fetchMock.mock.calls[0][0]));
+    expect(calledUrl).toContain("_page=2");
+    expect(calledUrl).toContain("_per_page=50");
+    expect(calledUrl).toContain("f_creationDate=creationDate:[");
+    expect(calledUrl).toContain("2025-01-01T00:00:00.000Z");
+    expect(calledUrl).toContain("2025-01-31T23:59:59.999Z");
+  });
+
   it("throws when VTEX responds with HTTP error", async () => {
     vi.spyOn(global, "fetch").mockResolvedValue(
       new Response("Unauthorized", { status: 401, statusText: "Unauthorized" }),
