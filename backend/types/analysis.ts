@@ -142,3 +142,10 @@ export interface AnalysisSuccess {
 }
 
 export type AnalysisResponse = AnalysisSuccess | AnalysisError;
+
+export interface AnalysisOptions {
+  page?: number;
+  perPage?: number;
+  startDate?: string;
+  endDate?: string;
+}
