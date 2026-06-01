@@ -25,3 +25,10 @@ export interface VtexOrder {
 export interface VtexOrdersResponse {
   list: VtexOrder[];
 }
+
+export interface FetchVtexOptions {
+  page?: number;
+  perPage?: number;
+  startDate?: string;
+  endDate?: string;
+}
