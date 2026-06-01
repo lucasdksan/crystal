@@ -1,4 +1,8 @@
-import type { VtexOrder, VtexOrdersResponse } from "@/backend/types/vtex";
+import type {
+  FetchVtexOptions,
+  VtexOrder,
+  VtexOrdersResponse,
+} from "@/backend/types/vtex";
 
 function centsToCurrency(value: number): number {
   return value / 100;
@@ -34,9 +38,36 @@ function getVtexConfig() {
   };
 }
 
-export async function fetchVtexOrders(): Promise<VtexOrder[]> {
+function buildOrdersQuery(options?: FetchVtexOptions): string {
+  if (!options || Object.keys(options).length === 0) {
+    return "?_items=1";
+  }
+
+  const params = new URLSearchParams();
+
+  if (options.page != null) {
+    params.set("_page", String(options.page));
+  }
+  if (options.perPage != null) {
+    params.set("_per_page", String(options.perPage));
+  }
+  if (options.startDate && options.endDate) {
+    params.set(
+      "f_creationDate",
+      `creationDate:[${options.startDate} TO ${options.endDate}]`,
+    );
+  }
+
+  const qs = params.toString();
+  return qs ? `?${qs}` : "?_items=1";
+}
+
+export async function fetchVtexOrders(
+  options?: FetchVtexOptions,
+): Promise<VtexOrder[]> {
   const { baseUrl, appKey, appToken } = getVtexConfig();
-  const response = await fetch(`${baseUrl}api/oms/pvt/orders?_items=1`, {
+  const query = buildOrdersQuery(options);
+  const response = await fetch(`${baseUrl}api/oms/pvt/orders${query}`, {
     headers: {
       "Content-Type": "application/json",
       "X-VTEX-API-AppKey": appKey,
