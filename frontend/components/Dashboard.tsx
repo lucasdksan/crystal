@@ -2,12 +2,36 @@
 
 import React, { useState, useRef } from "react";
 import type { DashboardData } from "@/frontend/types/dashboard";
+import { runAnalysis } from "@/backend/actions/analysis";
+import { mapAnalysisResultToDashboard } from "@/frontend/lib/mapper";
+import {
+  ACTION_PLAN_FOOTNOTES,
+  ACTION_PLAN_HEADERS,
+  ACTION_PLAN_ITEMS,
+  EXECUTIVE_TITLES,
+  actionPlanColorClasses,
+  getHealthState,
+} from "@/frontend/lib/action-plan";
+import { applyHealthySimulation } from "@/frontend/lib/simulation";
+import { buildHtmlReport } from "@/frontend/lib/report";
 import { KPICard } from "@/frontend/components/KPICard";
 import { ClustersTab } from "@/frontend/components/ClustersTab";
 import { FlowTab } from "@/frontend/components/FlowTab";
 import { DiagnosticsTab } from "@/frontend/components/DiagnosticsTab";
 import { AnomalyTab } from "@/frontend/components/AnomalyTab";
 import { MentorChat } from "@/frontend/components/MentorChat";
+import {
+  DateRangeFilter,
+  type DateFilterMode,
+} from "@/frontend/components/DateRangeFilter";
+import {
+  calendarDateToVtexIso,
+  formatCalendarDatePtBr,
+  getDefaultEndDate,
+  getDefaultStartDate,
+  getQuickRangeDays,
+  validateDateRange,
+} from "@/frontend/lib/vtex-dates";
 import {
   DollarSign,
   TrendingUp,
@@ -27,419 +51,9 @@ import {
   Download,
 } from "lucide-react";
 
-type HealthState = "critical" | "warning" | "healthy" | "simulation";
-
-function getHealthState(
-  taxaCancelamento: number,
-  isSimulation: boolean,
-): HealthState {
-  if (isSimulation) return "simulation";
-  if (taxaCancelamento > 50) return "critical";
-  if (taxaCancelamento < 15) return "healthy";
-  return "warning";
-}
-
-const EXECUTIVE_TITLES: Record<HealthState, string> = {
-  critical:
-    "Sua Loja possui uma Ilusão de Caixa e Carga Logística Estéril.",
-  warning: "Sua Loja opera com Alto Risco de Receita. Corrija agora.",
-  healthy: "Sua Loja está Saudável. Continue escalando com inteligência.",
-  simulation:
-    "Meta de 15% alcançada — sua loja está em rota de recuperação comercial!",
-};
-
-const ACTION_PLAN_HEADERS: Record<HealthState, string> = {
-  critical: "Prioridades para Sair do Abismo",
-  warning: "Ações Urgentes para Estabilizar Receita",
-  healthy: "Próximos Passos para Escalar",
-  simulation: "Manter o Momentum Pós-Correção",
-};
-
-const ACTION_PLAN_ITEMS: Record<
-  HealthState,
-  Array<{ num: string; color: string; title: string; desc: string }>
-> = {
-  critical: [
-    {
-      num: "1",
-      color: "rose",
-      title: "Bloquear Nota Promissória",
-      desc: "Grupos com promissórias operam em ciclos fantasma no Marketplace. Retire hoje.",
-    },
-    {
-      num: "2",
-      color: "amber",
-      title: "Réguas automáticas de Boletos",
-      desc: "Grupos com boletos bancários somem. Envie link Pix no Whatsapp 2h depois.",
-    },
-    {
-      num: "3",
-      color: "emerald",
-      title: "Promoção para Girar Estoque",
-      desc: "Liquidar o volume retido associando produtos com desconto em Pix.",
-    },
-  ],
-  warning: [
-    {
-      num: "1",
-      color: "rose",
-      title: "Auditar Métodos de Pagamento Frágeis",
-      desc: "Identifique clusters com cancelamento acima de 30% e restrinja métodos problemáticos.",
-    },
-    {
-      num: "2",
-      color: "amber",
-      title: "Ativar Réguas de Recuperação",
-      desc: "Configure lembretes automáticos de PIX para pedidos pendentes há mais de 2 horas.",
-    },
-    {
-      num: "3",
-      color: "emerald",
-      title: "Replicar Padrão dos Grupos Saudáveis",
-      desc: "Analise os clusters com alta conversão e incentive o mesmo perfil de compra.",
-    },
-  ],
-  healthy: [
-    {
-      num: "1",
-      color: "emerald",
-      title: "Manter Métodos de Pagamento Eficientes",
-      desc: "Continue priorizando PIX e pagamento imediato — são seus maiores conversores.",
-    },
-    {
-      num: "2",
-      color: "indigo",
-      title: "Expandir Kits de Produtos Campeões",
-      desc: "Monte combos com os produtos de maior volume para aumentar ticket médio.",
-    },
-    {
-      num: "3",
-      color: "blue",
-      title: "Monitorar Perdas Semanalmente",
-      desc: "Revise as Perdas Identificadas toda semana para recuperar receita em risco.",
-    },
-  ],
-  simulation: [
-    {
-      num: "1",
-      color: "emerald",
-      title: "Consolidar Desativação de Promissórias",
-      desc: "Mantenha promissórias bloqueadas — a simulação provou o ganho de 45% no lucro líquido.",
-    },
-    {
-      num: "2",
-      color: "indigo",
-      title: "Automatizar Conversão PIX",
-      desc: "Implemente cupom PIX automático para os 85% de faturamentos pendentes convertidos.",
-    },
-    {
-      num: "3",
-      color: "blue",
-      title: "Escalar Campanhas de Fidelização",
-      desc: "Invista em retenção dos grupos saudáveis com promoções segmentadas.",
-    },
-  ],
-};
-
-const ACTION_PLAN_FOOTNOTES: Record<HealthState, string> = {
-  critical:
-    "*Garantia: Resolver boletos eleva o lucro líquido em até 45% sem necessidade de aumentar novos anúncios.",
-  warning:
-    "*Dados reais: cada ponto percentual de cancelamento reduzido representa receita líquida recuperada imediatamente.",
-  healthy:
-    "*Parabéns! Sua taxa de cancelamento está abaixo de 15% — foco agora em crescimento e retenção.",
-  simulation:
-    "*Simulação ativa: estes dados refletem o cenário pós-correção com meta de 15% de cancelamento.",
-};
-
-function getAnomalyRecommendation(score: number, action: string): string {
-  if (score >= 75) return action || "Descontinuar";
-  if (score >= 50) return action || "Investigar";
-  if (score >= 25) return action || "Monitorar";
-  return action || "Manter";
-}
-
-function fmt(value: number) {
-  return value.toLocaleString("pt-BR", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
-}
-
-function gravityColor(g: string) {
-  if (g === "Alto") return "#dc2626";
-  if (g === "Médio") return "#d97706";
-  return "#059669";
-}
-
-function buildHtmlReport(data: DashboardData): string {
-  const netRevenue =
-    data.overview.receitaTotal * (1 - data.overview.taxaCancelamento / 100);
-  const stuckInventory =
-    data.overview.receitaTotal * (data.overview.taxaCancelamento / 100);
-  const generatedAt = new Date().toLocaleString("pt-BR");
-
-  const suspiciousProducts = (data.productAnomalies ?? []).filter(
-    (product) => product.anomalyScore >= 50,
-  );
-
-  const clusterRows = data.clusters
-    .map(
-      (c) => `
-    <tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-weight:600">${c.name.replace(`Cluster ${c.id} - `, "")}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center">${c.count}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:right">R$ ${fmt(c.averageValue)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;color:${c.cancelRate > 30 ? "#dc2626" : "#059669"};font-weight:700">${c.cancelRate.toFixed(1)}%</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center">${c.revenueShare.toFixed(1)}%</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;color:#374151;font-size:12px">${c.description}</td>
-    </tr>`,
-    )
-    .join("");
-
-  const anomalyRows =
-    suspiciousProducts.length === 0
-      ? `<tr><td colspan="5" style="padding:16px;text-align:center;color:#94a3b8">Nenhum produto em risco identificado.</td></tr>`
-      : suspiciousProducts
-          .slice(0, 10)
-          .map(
-            (product) => `
-    <tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-weight:600">${product.name}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:right">R$ ${fmt(product.canceledRevenue)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;text-align:center;font-weight:700;color:${product.anomalyScore >= 75 ? "#dc2626" : "#d97706"}">${product.anomalyScore.toFixed(1)}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9">${(product.cancellationRate * 100).toFixed(1)}%</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-weight:600;color:#4f46e5">${getAnomalyRecommendation(product.anomalyScore, product.action)}</td>
-    </tr>`,
-          )
-          .join("");
-
-  const riskRows =
-    data.diagnostics.risks.length === 0
-      ? `<tr><td colspan="3" style="padding:16px;text-align:center;color:#94a3b8">Nenhum risco identificado.</td></tr>`
-      : data.diagnostics.risks
-          .map(
-            (r) => `
-    <tr>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9">${r.product}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9">${r.type}</td>
-      <td style="padding:10px 12px;border-bottom:1px solid #f1f5f9;font-weight:700;color:${gravityColor(r.gravity)}">${r.gravity}</td>
-    </tr>`,
-          )
-          .join("");
-
-  return `<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-  <meta charset="UTF-8" />
-  <title>Relatório Crystal — ${data.reportId}</title>
-  <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f8fafc; color: #1e293b; font-size: 14px; }
-    .page { max-width: 960px; margin: 0 auto; padding: 40px 32px; }
-    .header { background: #1e293b; color: white; border-radius: 16px; padding: 32px; margin-bottom: 32px; }
-    .header h1 { font-size: 22px; font-weight: 800; margin-bottom: 4px; }
-    .header .meta { color: #94a3b8; font-size: 12px; }
-    .section { background: white; border-radius: 16px; border: 1px solid #f1f5f9; padding: 24px; margin-bottom: 24px; }
-    .section h2 { font-size: 15px; font-weight: 700; margin-bottom: 16px; color: #1e293b; border-bottom: 2px solid #f1f5f9; padding-bottom: 10px; }
-    .kpi-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; margin-bottom: 16px; }
-    .kpi { background: #f8fafc; border-radius: 12px; padding: 16px; border: 1px solid #f1f5f9; }
-    .kpi .label { font-size: 11px; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
-    .kpi .value { font-size: 20px; font-weight: 800; color: #1e293b; }
-    .kpi .sub { font-size: 11px; color: #94a3b8; margin-top: 2px; }
-    .kpi.red .value { color: #dc2626; }
-    .kpi.green .value { color: #059669; }
-    .summary-box { background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 10px; padding: 14px 16px; color: #166534; font-size: 13px; line-height: 1.6; }
-    table { width: 100%; border-collapse: collapse; }
-    thead tr { background: #f8fafc; }
-    th { padding: 10px 12px; text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: #64748b; border-bottom: 2px solid #f1f5f9; }
-    th.right { text-align: right; }
-    th.center { text-align: center; }
-    .footer { text-align: center; color: #94a3b8; font-size: 11px; padding: 24px 0 0; }
-    @media print {
-      body { background: white; }
-      .page { padding: 20px; }
-      .no-print { display: none; }
-    }
-  </style>
-</head>
-<body>
-<div class="page">
-
-  <div class="header">
-    <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:12px">
-      <div>
-        <div style="font-size:11px;color:#94a3b8;letter-spacing:0.08em;text-transform:uppercase;margin-bottom:6px">Auditoria de Negócios Crystal</div>
-        <h1>Relatório de Análise de Vendas</h1>
-        <div class="meta" style="margin-top:8px">ID: ${data.reportId} &nbsp;·&nbsp; ${data.reportDate} &nbsp;·&nbsp; Gerado em ${generatedAt}</div>
-      </div>
-      <div style="text-align:right">
-        <div style="font-size:11px;color:#94a3b8">Taxa de Cancelamento</div>
-        <div style="font-size:36px;font-weight:900;color:${data.overview.taxaCancelamento > 50 ? "#f87171" : data.overview.taxaCancelamento > 15 ? "#fbbf24" : "#34d399"}">${data.overview.taxaCancelamento.toFixed(1)}%</div>
-      </div>
-    </div>
-  </div>
-
-  <div class="section">
-    <h2>Resumo Executivo</h2>
-    <div class="kpi-grid">
-      <div class="kpi">
-        <div class="label">Faturamento Bruto</div>
-        <div class="value">R$ ${fmt(data.overview.receitaTotal)}</div>
-        <div class="sub">${data.overview.totalPedidos} pedidos no lote</div>
-      </div>
-      <div class="kpi green">
-        <div class="label">Receita Líquida Real</div>
-        <div class="value">R$ ${fmt(netRevenue)}</div>
-        <div class="sub">Dinheiro que entrou no caixa</div>
-      </div>
-      <div class="kpi red">
-        <div class="label">Estoque Travado</div>
-        <div class="value">R$ ${fmt(stuckInventory)}</div>
-        <div class="sub">Valor preso em cancelamentos</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Ticket Médio</div>
-        <div class="value">R$ ${fmt(data.overview.ticketMedio)}</div>
-        <div class="sub">Média por carrinho</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Pedidos Entregues</div>
-        <div class="value">${data.overview.taxaEntrega.toFixed(1)}%</div>
-        <div class="sub">Conversão física efetiva</div>
-      </div>
-      <div class="kpi">
-        <div class="label">Grupos de Clientes</div>
-        <div class="value">${data.overview.totalClusters}</div>
-        <div class="sub">Perfis comportamentais</div>
-      </div>
-    </div>
-    ${data.diagnostics.summary ? `<div class="summary-box">${data.diagnostics.summary}</div>` : ""}
-  </div>
-
-  <div class="section">
-    <h2>Grupos de Clientes — Ações por Perfil</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Grupo</th>
-          <th class="center">Pedidos</th>
-          <th class="right">Ticket Médio</th>
-          <th class="center">Cancelamento</th>
-          <th class="center">% Receita</th>
-          <th>Ação Recomendada</th>
-        </tr>
-      </thead>
-      <tbody>${clusterRows}</tbody>
-    </table>
-  </div>
-
-  ${
-    suspiciousProducts.length > 0
-      ? `<div class="section">
-    <h2>Produtos que Requerem Atenção (Score &gt;= 50)</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Produto</th>
-          <th class="right">Receita Cancelada</th>
-          <th class="center">Score</th>
-          <th>Cancelamento</th>
-          <th>Recomendação</th>
-        </tr>
-      </thead>
-      <tbody>${anomalyRows}</tbody>
-    </table>
-  </div>`
-      : ""
-  }
-
-  ${
-    data.diagnostics.risks.length > 0
-      ? `<div class="section">
-    <h2>Riscos e Gargalos de Estoque</h2>
-    <table>
-      <thead>
-        <tr>
-          <th>Produto / Situação</th>
-          <th>Tipo de Risco</th>
-          <th>Gravidade</th>
-        </tr>
-      </thead>
-      <tbody>${riskRows}</tbody>
-    </table>
-  </div>`
-      : ""
-  }
-
-  ${
-    data.diagnostics.allStrategies.length > 0
-      ? `<div class="section">
-    <h2>Estratégias Prioritárias</h2>
-    <div style="display:flex;flex-direction:column;gap:12px">
-      ${data.diagnostics.allStrategies
-        .slice(0, 5)
-        .map(
-          (s) => `
-      <div style="background:#f8fafc;border-radius:10px;padding:14px 16px;border:1px solid #f1f5f9">
-        <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:6px">
-          <div>
-            <span style="font-size:10px;font-weight:700;text-transform:uppercase;color:#4f46e5;background:#eef2ff;padding:2px 6px;border-radius:4px">${s.type.replace(/_/g, " ")}</span>
-            <div style="font-weight:700;margin-top:4px">${s.label}</div>
-          </div>
-          <span style="font-size:11px;color:#64748b;background:white;padding:3px 8px;border-radius:6px;border:1px solid #e2e8f0">Prioridade ${s.priorityScore.toFixed(2)}</span>
-        </div>
-        ${s.actions.length > 0 ? `<ul style="margin-top:8px;padding-left:18px;color:#475569;font-size:13px;line-height:1.7">${s.actions.map((a) => `<li><strong>${a.label}:</strong> ${a.description}</li>`).join("")}</ul>` : ""}
-      </div>`,
-        )
-        .join("")}
-    </div>
-  </div>`
-      : ""
-  }
-
-  <div class="footer">
-    <p>Auditoria de Negócios Crystal · Gerado automaticamente em ${generatedAt}</p>
-    <p style="margin-top:4px">Este relatório é confidencial e destinado exclusivamente ao lojista.</p>
-  </div>
-
-</div>
-<script>window.onload = function(){ window.print(); }</script>
-</body>
-</html>`;
-}
-
 interface DashboardProps {
   initialData: DashboardData;
 }
-
-const HEALTHY_OVERRIDE: Partial<DashboardData> = {
-  reportId: "K-Opt-Healthy-Sim",
-  reportDate: "Simulação de Meta Concluída",
-  overview: {
-    receitaTotal: 22677.0,
-    ticketMedio: 1511.8,
-    taxaCancelamento: 15.0,
-    taxaEntrega: 86.6,
-    errosWorkflow: 0,
-    totalPedidos: 15,
-    totalClusters: 4,
-  },
-  statuses: [
-    { name: "Cancelado", count: 2, color: "#ef4444" },
-    { name: "Pronto para Separação", count: 13, color: "#10b981" },
-  ],
-  diagnostics: {
-    summary:
-      "Parabéns! Sua loja alcançou o estado saudável pós-auditoria. Promissórias foram desativadas e 85% dos faturamentos pendentes foram convertidos via cupom PIX.",
-    championProduct: "Produto Campeão de Vendas",
-    bottleneckProduct: "Nenhum gargalo de estoque ativo no momento",
-    risks: [{ product: "Item de baixo risco", type: "Equilíbrio de Estoque", gravity: "Baixo" }],
-    suggestions: [],
-    allStrategies: [],
-    clusterRisks: [],
-  },
-};
 
 export function Dashboard({ initialData }: DashboardProps) {
   const [activeTab, setActiveTab] = useState<
@@ -447,7 +61,14 @@ export function Dashboard({ initialData }: DashboardProps) {
   >("geral");
   const [dashboardData, setDashboardData] =
     useState<DashboardData>(initialData);
+  const [baselineData, setBaselineData] = useState<DashboardData>(initialData);
   const [isHealthySimulation, setIsHealthySimulation] = useState(false);
+  const [dateFilterMode, setDateFilterMode] = useState<DateFilterMode>("all");
+  const [startDateInput, setStartDateInput] = useState(() =>
+    getDefaultStartDate(30),
+  );
+  const [endDateInput, setEndDateInput] = useState(() => getDefaultEndDate());
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -466,22 +87,83 @@ export function Dashboard({ initialData }: DashboardProps) {
 
   const handleToggleSimulation = () => {
     if (!isHealthySimulation) {
-      setDashboardData((prev) => ({
-        ...prev,
-        ...HEALTHY_OVERRIDE,
-        overview: { ...prev.overview, ...HEALTHY_OVERRIDE.overview },
-        statuses: HEALTHY_OVERRIDE.statuses ?? prev.statuses,
-        diagnostics: HEALTHY_OVERRIDE.diagnostics ?? prev.diagnostics,
-      }));
+      setDashboardData((prev) => applyHealthySimulation(prev));
       setIsHealthySimulation(true);
       showTemporarySuccess(
-        "Simulador de Meta Inteligente Ativado! Dados atualizados ficticiamente.",
+        "Cenário ilustrativo ativado — dados fictícios para demonstração.",
       );
     } else {
-      setDashboardData(initialData);
+      setDashboardData(baselineData);
       setIsHealthySimulation(false);
       showTemporarySuccess("Voltando para os dados reais registrados.");
     }
+  };
+
+  const fetchAnalysisForRange = async (
+    startDate: string,
+    endDate: string,
+    successLabel: string,
+  ) => {
+    setIsRefreshing(true);
+    setIsHealthySimulation(false);
+
+    try {
+      const result = await runAnalysis({
+        startDate,
+        endDate,
+        perPage: 50,
+      });
+
+      if (result.success) {
+        setDashboardData(mapAnalysisResultToDashboard(result.data));
+        setDateFilterMode("custom");
+        showTemporarySuccess(successLabel);
+      } else {
+        showTemporaryError(result.error);
+      }
+    } catch {
+      showTemporaryError("Erro ao atualizar análise para o período selecionado.");
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
+
+  const handleApplyCustomRange = async () => {
+    const validationError = validateDateRange(startDateInput, endDateInput);
+    if (validationError) {
+      showTemporaryError(validationError);
+      return;
+    }
+
+    const startDate = calendarDateToVtexIso(startDateInput, "start");
+    const endDate = calendarDateToVtexIso(endDateInput, "end");
+
+    await fetchAnalysisForRange(
+      startDate,
+      endDate,
+      `Análise atualizada — ${formatCalendarDatePtBr(startDateInput)} até ${formatCalendarDatePtBr(endDateInput)}.`,
+    );
+  };
+
+  const handleQuickRange = async (days: number) => {
+    const end = getDefaultEndDate();
+    const start = getDefaultStartDate(days);
+    setStartDateInput(start);
+    setEndDateInput(end);
+
+    const { startDate, endDate } = getQuickRangeDays(days);
+    await fetchAnalysisForRange(
+      startDate,
+      endDate,
+      `Análise atualizada — últimos ${days} dias.`,
+    );
+  };
+
+  const handleResetToFullBatch = () => {
+    setDateFilterMode("all");
+    setDashboardData(baselineData);
+    setIsHealthySimulation(false);
+    showTemporarySuccess("Período restaurado para o lote completo (SSR).");
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -496,7 +178,9 @@ export function Dashboard({ initialData }: DashboardProps) {
           const parsed = JSON.parse(text);
           if (parsed.overview && parsed.clusters && parsed.centroids) {
             setDashboardData(parsed);
+            setBaselineData(parsed);
             setIsHealthySimulation(false);
+            setDateFilterMode("all");
             showTemporarySuccess(
               `Sucesso! Relatório '${file.name}' importado com êxito!`,
             );
@@ -521,12 +205,16 @@ export function Dashboard({ initialData }: DashboardProps) {
 
   const handleResetData = () => {
     setDashboardData(initialData);
+    setBaselineData(initialData);
     setIsHealthySimulation(false);
+    setDateFilterMode("all");
     showTemporarySuccess("Dados restaurados para o relatório original.");
   };
 
   const isDataModified =
-    dashboardData !== initialData || isHealthySimulation;
+    dashboardData !== baselineData ||
+    isHealthySimulation ||
+    dateFilterMode !== "all";
 
   const isCritical = dashboardData.overview.taxaCancelamento > 50;
   const healthState = getHealthState(
@@ -551,37 +239,6 @@ export function Dashboard({ initialData }: DashboardProps) {
     setTimeout(() => URL.revokeObjectURL(url), 60000);
   };
 
-  const actionPlanColorClasses: Record<
-    string,
-    { bg: string; border: string; text: string }
-  > = {
-    rose: {
-      bg: "bg-rose-50",
-      border: "border-rose-200",
-      text: "text-rose-700",
-    },
-    amber: {
-      bg: "bg-amber-50",
-      border: "border-amber-200",
-      text: "text-amber-700",
-    },
-    emerald: {
-      bg: "bg-emerald-50",
-      border: "border-emerald-200",
-      text: "text-emerald-700",
-    },
-    indigo: {
-      bg: "bg-indigo-50",
-      border: "border-indigo-200",
-      text: "text-indigo-700",
-    },
-    blue: {
-      bg: "bg-blue-50",
-      border: "border-blue-200",
-      text: "text-blue-700",
-    },
-  };
-
   return (
     <div className="min-h-screen bg-[#fafbfe] text-slate-800 flex flex-col justify-between font-sans selection:bg-indigo-100 antialiased">
       {isCritical && !isHealthySimulation && (
@@ -600,8 +257,9 @@ export function Dashboard({ initialData }: DashboardProps) {
           <button
             onClick={handleToggleSimulation}
             className="ml-4 bg-white/20 hover:bg-white/30 text-white font-bold p-1 px-2.5 rounded-md transition-colors border border-white/20 uppercase text-[9px]"
+            title="Ativa cenário ilustrativo com dados fictícios — não é predição real"
           >
-            Simular Correção
+            Ver Cenário Ilustrativo
           </button>
         </div>
       )}
@@ -629,6 +287,18 @@ export function Dashboard({ initialData }: DashboardProps) {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <DateRangeFilter
+              mode={dateFilterMode}
+              startDate={startDateInput}
+              endDate={endDateInput}
+              isLoading={isRefreshing}
+              onStartDateChange={setStartDateInput}
+              onEndDateChange={setEndDateInput}
+              onApplyCustomRange={handleApplyCustomRange}
+              onResetToFullBatch={handleResetToFullBatch}
+              onQuickRange={handleQuickRange}
+            />
+
             <button
               onClick={() => fileInputRef.current?.click()}
               className="flex items-center gap-2 p-2.5 px-4 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 text-xs font-semibold rounded-xl shadow-xs cursor-pointer transition-colors"
@@ -663,12 +333,13 @@ export function Dashboard({ initialData }: DashboardProps) {
                   ? "bg-slate-900 text-white border border-slate-950 hover:bg-slate-800"
                   : "bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-700"
               }`}
+              title="Exibe dados fictícios de demonstração — não é predição real nem meta garantida"
             >
               <Sparkles className="w-4 h-4 text-emerald-300 animate-pulse" />
               <span>
                 {isHealthySimulation
-                  ? "Sair da Simulação"
-                  : "Simular Meta 15%"}
+                  ? "Sair do Cenário Ilustrativo"
+                  : "Cenário Ilustrativo 15%"}
               </span>
             </button>
 
