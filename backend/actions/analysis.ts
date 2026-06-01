@@ -1,6 +1,6 @@
 "use server";
 
-import type { AnalysisResponse } from "@/backend/types/analysis";
+import type { AnalysisOptions, AnalysisResponse } from "@/backend/types/analysis";
 import { fetchVtexOrders } from "@/backend/services/vtex.service";
 import {
   buildFeatureVectors,
@@ -11,9 +11,11 @@ import { runSom } from "@/backend/services/som.service";
 import { runProductKmeans } from "@/backend/services/product-kmeans.service";
 import { buildDiagnostics } from "@/backend/services/diagnostics.service";
 
-export async function runAnalysis(): Promise<AnalysisResponse> {
+export async function runAnalysis(
+  options?: AnalysisOptions,
+): Promise<AnalysisResponse> {
   try {
-    const rawList = await fetchVtexOrders();
+    const rawList = await fetchVtexOrders(options);
     const orders = processOrders(rawList);
     const { normalizedVectors, mins, maxs } = buildFeatureVectors(orders);
     const kmeans = runKmeans(normalizedVectors);
