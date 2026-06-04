@@ -22,8 +22,16 @@ export interface VtexOrder {
   isAllDelivered: boolean;
 }
 
+export interface VtexOrdersPaging {
+  total: number;
+  pages: number;
+  currentPage: number;
+  perPage: number;
+}
+
 export interface VtexOrdersResponse {
   list: VtexOrder[];
+  paging?: VtexOrdersPaging;
 }
 
 export interface FetchVtexOptions {
