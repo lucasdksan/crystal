@@ -115,9 +115,12 @@ export function Dashboard({ initialData }: DashboardProps) {
       });
 
       if (result.success) {
-        setDashboardData(mapAnalysisResultToDashboard(result.data));
+        const mapped = mapAnalysisResultToDashboard(result.data);
+        setDashboardData(mapped);
         setDateFilterMode("custom");
-        showTemporarySuccess(successLabel);
+        showTemporarySuccess(
+          `${successLabel} (${mapped.overview.totalPedidos} pedidos)`,
+        );
       } else {
         showTemporaryError(result.error);
       }
@@ -215,6 +218,8 @@ export function Dashboard({ initialData }: DashboardProps) {
     dashboardData !== baselineData ||
     isHealthySimulation ||
     dateFilterMode !== "all";
+
+  const analysisKey = `${dashboardData.reportId}-${dashboardData.overview.totalPedidos}-${dashboardData.overview.receitaTotal}`;
 
   const isCritical = dashboardData.overview.taxaCancelamento > 50;
   const healthState = getHealthState(
@@ -592,16 +597,20 @@ export function Dashboard({ initialData }: DashboardProps) {
           )}
 
           {activeTab === "clientes" && (
-            <ClustersTab data={dashboardData} />
+            <ClustersTab key={analysisKey} data={dashboardData} />
           )}
-          {activeTab === "fluxo" && <FlowTab data={dashboardData} />}
+          {activeTab === "fluxo" && (
+            <FlowTab key={analysisKey} data={dashboardData} />
+          )}
           {activeTab === "anomalias" && (
-            <AnomalyTab data={dashboardData} />
+            <AnomalyTab key={analysisKey} data={dashboardData} />
           )}
           {activeTab === "diagnósticos" && (
-            <DiagnosticsTab data={dashboardData} />
+            <DiagnosticsTab key={analysisKey} data={dashboardData} />
           )}
-          {activeTab === "mentor" && <MentorChat data={dashboardData} />}
+          {activeTab === "mentor" && (
+            <MentorChat key={analysisKey} data={dashboardData} />
+          )}
         </main>
       </div>
 
