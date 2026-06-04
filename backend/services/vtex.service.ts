@@ -4,6 +4,14 @@ import type {
   VtexOrdersResponse,
 } from "@/backend/types/vtex";
 
+const DEFAULT_PER_PAGE = 100;
+const MAX_PAGES = 30;
+
+/** VTEX OMS rejects milliseconds in f_creationDate (expects …T00:00:00Z). */
+function toVtexOmsIso(iso: string): string {
+  return iso.replace(/\.\d{3}Z$/, "Z");
+}
+
 function centsToCurrency(value: number): number {
   return value / 100;
 }
@@ -12,7 +20,7 @@ function normalizeOrderMonetaryValues(order: VtexOrder): VtexOrder {
   return {
     ...order,
     totalValue: centsToCurrency(order.totalValue),
-    items: order.items.map((item) => ({
+    items: (order.items ?? []).map((item) => ({
       ...item,
       price: centsToCurrency(item.price),
       sellingPrice: centsToCurrency(item.sellingPrice),
@@ -38,33 +46,30 @@ function getVtexConfig() {
   };
 }
 
-function buildOrdersQuery(options?: FetchVtexOptions): string {
-  if (!options || Object.keys(options).length === 0) {
-    return "?_items=1";
-  }
-
+function buildOrdersQuery(options: FetchVtexOptions & { page: number; perPage: number }): string {
   const params = new URLSearchParams();
 
-  if (options.page != null) {
-    params.set("_page", String(options.page));
-  }
-  if (options.perPage != null) {
-    params.set("_per_page", String(options.perPage));
-  }
+  // VTEX omits line items when _items is absent; analysis requires them.
+  params.set("_items", "1");
+  params.set("orderBy", "creationDate,desc");
+  params.set("page", String(options.page));
+  params.set("per_page", String(options.perPage));
+
   if (options.startDate && options.endDate) {
+    const startDate = toVtexOmsIso(options.startDate);
+    const endDate = toVtexOmsIso(options.endDate);
     params.set(
       "f_creationDate",
-      `creationDate:[${options.startDate} TO ${options.endDate}]`,
+      `creationDate:[${startDate} TO ${endDate}]`,
     );
   }
 
-  const qs = params.toString();
-  return qs ? `?${qs}` : "?_items=1";
+  return `?${params.toString()}`;
 }
 
-export async function fetchVtexOrders(
-  options?: FetchVtexOptions,
-): Promise<VtexOrder[]> {
+async function fetchOrdersPage(
+  options: FetchVtexOptions & { page: number; perPage: number },
+): Promise<VtexOrdersResponse> {
   const { baseUrl, appKey, appToken } = getVtexConfig();
   const query = buildOrdersQuery(options);
   const response = await fetch(`${baseUrl}api/oms/pvt/orders${query}`, {
@@ -82,11 +87,45 @@ export async function fetchVtexOrders(
     );
   }
 
-  const json = (await response.json()) as VtexOrdersResponse;
+  return (await response.json()) as VtexOrdersResponse;
+}
 
-  if (!json.list || json.list.length === 0) {
+export async function fetchVtexOrders(
+  options?: FetchVtexOptions,
+): Promise<VtexOrder[]> {
+  const hasDateFilter = Boolean(options?.startDate && options?.endDate);
+  const perPage = options?.perPage ?? DEFAULT_PER_PAGE;
+  const startPage = options?.page ?? 1;
+  const fetchAllPages = hasDateFilter && options?.page == null;
+
+  const allOrders: VtexOrder[] = [];
+  let page = startPage;
+
+  do {
+    const json = await fetchOrdersPage({
+      ...options,
+      page,
+      perPage,
+    });
+
+    const batch = (json.list ?? []).map(normalizeOrderMonetaryValues);
+    allOrders.push(...batch);
+
+    if (!fetchAllPages) {
+      break;
+    }
+
+    const totalPages = json.paging?.pages ?? 1;
+    if (page >= totalPages || batch.length < perPage) {
+      break;
+    }
+
+    page += 1;
+  } while (page <= MAX_PAGES);
+
+  if (allOrders.length === 0) {
     throw new Error("Nenhum pedido encontrado.");
   }
 
-  return json.list.map(normalizeOrderMonetaryValues);
+  return allOrders;
 }
