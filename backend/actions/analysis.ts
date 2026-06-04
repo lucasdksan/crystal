@@ -1,5 +1,6 @@
 "use server";
 
+import { unstable_noStore as noStore } from "next/cache";
 import type { AnalysisOptions, AnalysisResponse } from "@/backend/types/analysis";
 import { fetchVtexOrders } from "@/backend/services/vtex.service";
 import {
@@ -14,6 +15,8 @@ import { buildDiagnostics } from "@/backend/services/diagnostics.service";
 export async function runAnalysis(
   options?: AnalysisOptions,
 ): Promise<AnalysisResponse> {
+  noStore();
+
   try {
     const rawList = await fetchVtexOrders(options);
     const orders = processOrders(rawList);
