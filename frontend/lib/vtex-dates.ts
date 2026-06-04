@@ -1,3 +1,8 @@
+/** VTEX OMS rejects milliseconds in f_creationDate (expects …T00:00:00Z). */
+export function toVtexOmsIso(iso: string): string {
+  return iso.replace(/\.\d{3}Z$/, "Z");
+}
+
 /** Converte data do calendário (YYYY-MM-DD) para ISO no formato esperado pela VTEX OMS. */
 export function calendarDateToVtexIso(
   dateStr: string,
@@ -9,10 +14,14 @@ export function calendarDateToVtexIso(
   }
 
   if (boundary === "start") {
-    return new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString();
+    return toVtexOmsIso(
+      new Date(Date.UTC(year, month - 1, day, 0, 0, 0, 0)).toISOString(),
+    );
   }
 
-  return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
+  return toVtexOmsIso(
+    new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString(),
+  );
 }
 
 /** Formata YYYY-MM-DD para exibição pt-BR (dd/mm/aaaa). */
