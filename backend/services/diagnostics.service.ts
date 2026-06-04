@@ -70,7 +70,7 @@ function buildProductStats(rawList: VtexOrder[]): ProductStat[] {
   rawList.forEach((order) => {
     const isCanceled = order.status === "canceled";
 
-    order.items.forEach((item) => {
+    (order.items ?? []).forEach((item) => {
       const key = item.productId || item.description || "unknown";
       const label = item.description || `Produto ${item.productId}`;
 
