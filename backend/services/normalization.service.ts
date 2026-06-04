@@ -56,7 +56,7 @@ export function processOrders(list: VtexOrder[]): ProcessedOrder[] {
       orderId: order.orderId,
       clientName: order.clientName,
       creationDate: order.creationDate,
-      items: order.items.map((item) => ({
+      items: (order.items ?? []).map((item) => ({
         quantity: item.quantity,
         price: item.price,
         sellingPrice: item.sellingPrice,
