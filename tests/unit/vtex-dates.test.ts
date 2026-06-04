@@ -3,18 +3,23 @@ import {
   calendarDateToVtexIso,
   formatCalendarDatePtBr,
   getQuickRangeDays,
+  toVtexOmsIso,
   validateDateRange,
 } from "@/frontend/lib/vtex-dates";
 
 describe("vtex-dates", () => {
+  it("strips milliseconds for VTEX OMS ISO strings", () => {
+    expect(toVtexOmsIso("2026-04-01T00:00:00.000Z")).toBe("2026-04-01T00:00:00Z");
+  });
+
   it("converts calendar start date to UTC midnight ISO", () => {
     const iso = calendarDateToVtexIso("2026-04-01", "start");
-    expect(iso).toBe("2026-04-01T00:00:00.000Z");
+    expect(iso).toBe("2026-04-01T00:00:00Z");
   });
 
   it("converts calendar end date to UTC end-of-day ISO", () => {
     const iso = calendarDateToVtexIso("2026-06-30", "end");
-    expect(iso).toBe("2026-06-30T23:59:59.999Z");
+    expect(iso).toBe("2026-06-30T23:59:59Z");
   });
 
   it("formats date for pt-BR display", () => {
@@ -31,7 +36,7 @@ describe("vtex-dates", () => {
 
   it("getQuickRangeDays returns ISO bounds", () => {
     const range = getQuickRangeDays(30);
-    expect(range.startDate).toMatch(/T00:00:00\.000Z$/);
-    expect(range.endDate).toMatch(/T23:59:59\.999Z$/);
+    expect(range.startDate).toMatch(/T00:00:00Z$/);
+    expect(range.endDate).toMatch(/T23:59:59Z$/);
   });
 });
