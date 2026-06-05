@@ -1,3 +1,4 @@
+import type { CustomerIntelligenceResult, CustomerProfile } from "./customer";
 import type { ProcessedOrder } from "./order";
 
 export interface ElbowPoint {
@@ -17,6 +18,8 @@ export interface KmeansResult {
   elbowAnalysis: ElbowPoint[];
   silhouetteAnalysis: SilhouettePoint[];
   bestK: number;
+  elbowK: number;
+  paymentMethodsK: number;
 }
 
 export interface SomResult {
@@ -124,10 +127,12 @@ export interface NormalizationMeta {
 
 export interface AnalysisResult {
   orders: ProcessedOrder[];
+  customerProfiles: CustomerProfile[];
   kmeans: KmeansResult;
   som: SomResult;
   productKmeans: ProductKmeansResult;
   diagnostics: DiagnosticsResult;
+  customerIntelligence: CustomerIntelligenceResult;
   normalizationMeta: NormalizationMeta;
 }
 
