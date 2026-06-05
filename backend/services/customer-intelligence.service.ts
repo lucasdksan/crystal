@@ -1,4 +1,4 @@
-import type { KmeansResult } from "@/backend/types/analysis";
+import type { AgrupamentoResult } from "@/backend/types/analysis";
 import type {
   ChurnRiskLevel,
   ChurnScore,
@@ -8,8 +8,6 @@ import type {
   CustomerSegment,
   ExecutiveInsight,
   InsightPriority,
-  MigrationFlow,
-  ProductAffinityRule,
   RevenueOpportunity,
 } from "@/backend/types/customer";
 
@@ -338,150 +336,14 @@ function buildRevenueOpportunities(
   return opportunities;
 }
 
-function buildAffinityRules(profiles: CustomerProfile[]): ProductAffinityRule[] {
-  const pairCounts = new Map<string, number>();
-  const productCounts = new Map<string, number>();
-  const totalCustomers = profiles.length;
-
-  profiles.forEach((profile) => {
-    const products = profile.productNames.slice(0, 20);
-    products.forEach((product) => {
-      productCounts.set(product, (productCounts.get(product) ?? 0) + 1);
-    });
-
-    for (let i = 0; i < products.length; i++) {
-      for (let j = i + 1; j < products.length; j++) {
-        const key = [products[i], products[j]].sort().join("|||");
-        pairCounts.set(key, (pairCounts.get(key) ?? 0) + 1);
-      }
-    }
-  });
-
-  const rules: ProductAffinityRule[] = [];
-
-  pairCounts.forEach((count, key) => {
-    const [antecedent, consequent] = key.split("|||");
-    const support = count / totalCustomers;
-    const confidenceA = count / (productCounts.get(antecedent) ?? 1);
-    const confidenceB = count / (productCounts.get(consequent) ?? 1);
-    const supportB = (productCounts.get(consequent) ?? 0) / totalCustomers;
-    const liftA = supportB > 0 ? confidenceA / supportB : 0;
-    const liftB =
-      (productCounts.get(antecedent) ?? 0) / totalCustomers > 0
-        ? confidenceB / ((productCounts.get(antecedent) ?? 0) / totalCustomers)
-        : 0;
-    const lift = Math.max(liftA, liftB);
-    const confidence = Math.max(confidenceA, confidenceB);
-
-    if (lift > 1.2 && confidence > 0.3 && count >= 2) {
-      rules.push({
-        antecedent,
-        consequent,
-        support: Math.round(support * 1000) / 1000,
-        confidence: Math.round(confidence * 1000) / 1000,
-        lift: Math.round(lift * 100) / 100,
-      });
-    }
-  });
-
-  return rules.sort((a, b) => b.lift - a.lift).slice(0, 20);
-}
-
-function buildMigrationFlows(
-  profiles: CustomerProfile[],
-  segments: CustomerSegment[],
-  clusters: number[],
-): MigrationFlow[] {
-  const segmentByCluster = new Map(segments.map((s) => [s.id, s.name]));
-  const flows = new Map<string, { count: number; revenue: number }>();
-
-  profiles.forEach((profile, index) => {
-    if (profile.ordersTimeline.length < 2) return;
-
-    const midDate = new Date(profile.ordersTimeline[0].date).getTime() +
-      (new Date(profile.ordersTimeline[profile.ordersTimeline.length - 1].date).getTime() -
-        new Date(profile.ordersTimeline[0].date).getTime()) /
-        2;
-
-    const firstHalf = profile.ordersTimeline.filter(
-      (o) => new Date(o.date).getTime() <= midDate,
-    );
-    const secondHalf = profile.ordersTimeline.filter(
-      (o) => new Date(o.date).getTime() > midDate,
-    );
-
-    if (firstHalf.length === 0 || secondHalf.length === 0) return;
-
-    const firstTicket =
-      firstHalf.reduce((s, o) => s + o.value, 0) / firstHalf.length;
-    const secondTicket =
-      secondHalf.reduce((s, o) => s + o.value, 0) / secondHalf.length;
-    const firstFreq = firstHalf.length;
-    const secondFreq = secondHalf.length;
-
-    const currentSegment =
-      segmentByCluster.get(clusters[index]) ?? `Segmento ${clusters[index]}`;
-
-    let fromSegment = currentSegment;
-    let toSegment = currentSegment;
-
-    if (secondTicket > firstTicket * 1.2 && secondFreq >= firstFreq) {
-      fromSegment = "Clientes Oportunistas";
-      toSegment = "Clientes Recorrentes";
-    } else if (secondFreq < firstFreq && profile.daysSinceLastPurchase > 90) {
-      fromSegment = currentSegment.includes("VIP")
-        ? "Clientes VIP"
-        : "Clientes Recorrentes";
-      toSegment = "Clientes em Risco";
-    } else if (secondTicket > firstTicket * 1.3) {
-      fromSegment = "Clientes Recorrentes";
-      toSegment = "Clientes VIP";
-    } else {
-      return;
-    }
-
-    const key = `${fromSegment}→${toSegment}`;
-    const existing = flows.get(key) ?? { count: 0, revenue: 0 };
-    existing.count += 1;
-    existing.revenue += profile.totalSpent;
-    flows.set(key, existing);
-  });
-
-  return [...flows.entries()].map(([key, data]) => {
-    const [fromSegment, toSegment] = key.split("→");
-    return {
-      fromSegment,
-      toSegment,
-      customerCount: data.count,
-      revenueImpact: Math.round(data.revenue * 100) / 100,
-    };
-  });
-}
-
 function buildExecutiveInsights(
   profiles: CustomerProfile[],
   segments: CustomerSegment[],
   churnScores: ChurnScore[],
   clvEstimates: CLVEstimate[],
-  affinityRules: ProductAffinityRule[],
-  migrationFlows: MigrationFlow[],
   summary: CustomerIntelligenceResult["summary"],
 ): ExecutiveInsight[] {
   const insights: ExecutiveInsight[] = [];
-
-  const vipToRisk = migrationFlows.find(
-    (f) =>
-      f.fromSegment.includes("VIP") && f.toSegment.includes("Risco"),
-  );
-  if (vipToRisk && profiles.length > 0) {
-    const pct = ((vipToRisk.customerCount / profiles.length) * 100).toFixed(1);
-    insights.push({
-      text: `${pct}% dos clientes VIP migraram para risco elevado.`,
-      financialImpact: vipToRisk.revenueImpact,
-      priority: "alta",
-      category: "migracao",
-    });
-  }
 
   if (summary.recoverableRevenue > 0) {
     insights.push({
@@ -501,15 +363,6 @@ function buildExecutiveInsights(
         category: "segmentacao",
       });
     }
-  });
-
-  affinityRules.slice(0, 3).forEach((rule) => {
-    insights.push({
-      text: `Clientes que compram "${rule.antecedent}" possuem ${rule.lift}x mais chance de comprar "${rule.consequent}".`,
-      financialImpact: Math.round(rule.lift * 1000),
-      priority: rule.lift > 2 ? "alta" : "media",
-      category: "afinidade",
-    });
   });
 
   const criticalCount = churnScores.filter((c) => c.riskLevel === "critico").length;
@@ -548,7 +401,7 @@ function buildExecutiveInsights(
 
 export function runCustomerIntelligence(
   profiles: CustomerProfile[],
-  kmeans: KmeansResult,
+  agrupamento: AgrupamentoResult,
 ): CustomerIntelligenceResult {
   if (profiles.length === 0) {
     return {
@@ -557,8 +410,6 @@ export function runCustomerIntelligence(
       churnScores: [],
       clvEstimates: [],
       revenueOpportunities: [],
-      affinityRules: [],
-      migrationFlows: [],
       executiveInsights: [],
       summary: {
         recoverableRevenue: 0,
@@ -569,8 +420,12 @@ export function runCustomerIntelligence(
     };
   }
 
-  const segments = buildSegments(profiles, kmeans.clusters);
-  const clvEstimates = buildClvEstimates(profiles, segments, kmeans.clusters);
+  const segments = buildSegments(profiles, agrupamento.clusters);
+  const clvEstimates = buildClvEstimates(
+    profiles,
+    segments,
+    agrupamento.clusters,
+  );
   const churnScores = buildChurnScores(profiles, clvEstimates);
   const revenueOpportunities = buildRevenueOpportunities(
     profiles,
@@ -578,13 +433,6 @@ export function runCustomerIntelligence(
     clvEstimates,
     segments,
   );
-  const affinityRules = buildAffinityRules(profiles);
-  const migrationFlows = buildMigrationFlows(
-    profiles,
-    segments,
-    kmeans.clusters,
-  );
-
   const recoverableRevenue =
     revenueOpportunities.find((o) => o.type === "recoverable")?.estimatedValue ??
     0;
@@ -610,8 +458,6 @@ export function runCustomerIntelligence(
     segments,
     churnScores,
     clvEstimates,
-    affinityRules,
-    migrationFlows,
     summary,
   );
 
@@ -621,8 +467,6 @@ export function runCustomerIntelligence(
     churnScores,
     clvEstimates,
     revenueOpportunities,
-    affinityRules,
-    migrationFlows,
     executiveInsights,
     summary,
   };
