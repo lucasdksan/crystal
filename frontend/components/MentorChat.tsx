@@ -30,13 +30,13 @@ function buildWelcomeMessage(data: DashboardData): ChatMessage {
   const hasChurn = data.churnScores.length > 0;
   const hasClv = data.clvEstimates.length > 0;
   const mlSummary = [
-    `**${data.overview.totalClientes} clientes** em **${data.overview.totalClusters} clusters** (K-Means)`,
+    `**${data.overview.totalClientes} clientes** em **${data.overview.totalClusters} grupos** (Agrupamento)`,
     `CLV total estimado: **R$ ${data.overview.clvTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`,
     hasChurn
       ? `receita em risco: **R$ ${data.overview.receitaEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`
       : null,
-    hasClv && data.affinityRules.length > 0
-      ? `**${data.affinityRules.length} regras de afinidade** detectadas`
+    data.productIntelligence.clusters.length > 0
+      ? `**${data.productIntelligence.clusters.length} clusters de produtos** identificados`
       : null,
   ]
     .filter(Boolean)
@@ -45,7 +45,7 @@ function buildWelcomeMessage(data: DashboardData): ChatMessage {
   return {
     id: "default",
     sender: "assistant",
-    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Tenho acesso aos resultados dos modelos de ML desta análise — K-Means, SOM, churn, CLV, afinidade e mais.\n\n${mlSummary}\n\nTaxa de cancelamento: **${data.overview.taxaCancelamento.toFixed(1)}%** · **${data.overview.totalPedidos} pedidos** analisados.\n\nO que você gostaria de explorar? Pode perguntar livremente ou usar os atalhos abaixo!`,
+    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Tenho acesso aos resultados dos modelos de ML desta análise — agrupamento, churn, CLV, inteligência de produtos, BCG e mais.\n\n${mlSummary}\n\nTaxa de cancelamento: **${data.overview.taxaCancelamento.toFixed(1)}%** · **${data.overview.totalPedidos} pedidos** analisados.\n\nO que você gostaria de explorar? Pode perguntar livremente ou usar os atalhos abaixo!`,
     timestamp: formatChatTime(),
   };
 }
@@ -66,8 +66,8 @@ export function MentorChat({ data }: MentorChatProps) {
 
   const quickPrompts = [
     {
-      label: "📊 Clusters K-Means",
-      query: "Me explica de forma simples os clusters e o que eles significam para minha loja",
+      label: "📊 Agrupamento de Clientes",
+      query: "Me explica de forma simples os grupos de clientes e o que eles significam para minha loja",
     },
     {
       label: "🛡️ Churn Risk",
@@ -78,12 +78,8 @@ export function MentorChat({ data }: MentorChatProps) {
       query: "Quem são meus clientes mais valiosos e como proteger o CLV da minha base?",
     },
     {
-      label: "🔗 Afinidade",
-      query: "Quais produtos são comprados juntos e como montar kits de cross-sell?",
-    },
-    {
-      label: "🗺️ Mapa SOM",
-      query: "O que é o mapa de comportamento SOM e como interpretar os quadrantes?",
+      label: "📦 Produtos",
+      query: "Como está a saúde do meu catálogo e quais produtos precisam de atenção?",
     },
     {
       label: "💰 Oportunidades",
@@ -187,7 +183,7 @@ export function MentorChat({ data }: MentorChatProps) {
             </h3>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed">
               O <strong>Crystal Copilot</strong> acessa os resultados dos modelos
-              de ML — K-Means, SOM, churn, CLV, afinidade e migração — e traduz
+              de ML — agrupamento, churn, CLV, BCG e catálogo — e traduz
               tudo em recomendações comerciais práticas.
             </p>
           </div>
@@ -198,8 +194,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 1
               </span>
               <p>
-                Pergunte sobre clusters, churn, CLV, afinidade de produtos ou o
-                mapa SOM — com números reais da sua loja.
+                Pergunte sobre agrupamento, churn, CLV ou inteligência de produtos
+                — com números reais da sua loja.
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
@@ -207,8 +203,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 2
               </span>
               <p>
-                Peça planos de retenção para clientes em risco ou cross-sell via
-                regras de afinidade.
+                Peça planos de retenção para clientes em risco ou estratégias
+                para produtos campeões e da cauda longa.
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
@@ -216,8 +212,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 3
               </span>
               <p>
-                Explore oportunidades de receita incremental e migração entre
-                segmentos de clientes.
+                Explore oportunidades de receita incremental e saúde do
+                catálogo de produtos.
               </p>
             </div>
           </div>
