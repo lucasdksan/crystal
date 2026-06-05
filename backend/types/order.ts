@@ -10,6 +10,7 @@ export interface ProcessedOrderItem {
 export interface ProcessedOrder {
   orderId: string;
   clientName: string;
+  clientEmail: string;
   creationDate: string;
   items: ProcessedOrderItem[];
   totalValue: number;
