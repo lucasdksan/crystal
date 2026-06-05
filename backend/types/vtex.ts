@@ -10,6 +10,7 @@ export interface VtexOrderItem {
 export interface VtexOrder {
   orderId: string;
   clientName: string;
+  clientEmail?: string;
   creationDate: string;
   items: VtexOrderItem[];
   totalValue: number;
