@@ -6,7 +6,6 @@ import type {
   ClusterInfo,
   CentroidNormalized,
   CentroidDenormalized,
-  SOMNeuron,
   StatusDistribution,
   StrategicRisk,
   KitSuggestion,
@@ -561,141 +560,6 @@ function buildDenormalizedCentroids(
   });
 }
 
-function buildSomGrid(
-  profiles: CustomerProfile[],
-  predictions: [number, number][],
-  gridX: number,
-  gridY: number,
-  totalRevenue: number,
-): SOMNeuron[] {
-  const grid: SOMNeuron[] = [];
-
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const matchingProfiles = profiles.filter((_, i) => {
-        const pred = predictions[i];
-        return pred && pred[0] === r && pred[1] === c;
-      });
-
-      const count = matchingProfiles.length;
-      const value =
-        count > 0
-          ? matchingProfiles.reduce((s, p) => s + p.totalSpent, 0) / count
-          : 0;
-
-      const segmentRevenue = matchingProfiles.reduce(
-        (s, p) => s + p.totalSpent,
-        0,
-      );
-      const revenueShare =
-        totalRevenue > 0 ? (segmentRevenue / totalRevenue) * 100 : 0;
-
-      const paymentMix: Record<string, number> = {};
-      matchingProfiles.forEach((p) => {
-        const key = p.preferredPaymentMethod || "Desconhecido";
-        paymentMix[key] = (paymentMix[key] ?? 0) + 1;
-      });
-      if (count > 0) {
-        Object.keys(paymentMix).forEach((key) => {
-          paymentMix[key] = Math.round((paymentMix[key] / count) * 1000) / 10;
-        });
-      }
-
-      const hourCounts = Array(24).fill(0);
-      matchingProfiles.forEach((p) => {
-        hourCounts[p.preferredHour]++;
-      });
-      const peakHour = count > 0 ? hourCounts.indexOf(Math.max(...hourCounts)) : 0;
-
-      const label =
-        count > 0
-          ? `${count} cliente(s) neste quadrante. Ticket médio R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. ${revenueShare.toFixed(1)}% da receita.`
-          : "Quadrante vazio — nenhum cliente mapeado aqui.";
-
-      grid.push({
-        row: r,
-        col: c,
-        count,
-        value,
-        label,
-        cancelRate: 0,
-        deliveryRate: 0,
-        paymentMix,
-        peakHour,
-        peakDay: "—",
-        topProducts: [],
-        revenueShare: Math.round(revenueShare * 10) / 10,
-      });
-    }
-  }
-
-  return grid;
-}
-
-function buildSomGridLegacy(
-  orders: ProcessedOrder[],
-  predictions: [number, number][],
-  gridX: number,
-  gridY: number,
-): SOMNeuron[] {
-  const grid: SOMNeuron[] = [];
-
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const matchingOrders = orders.filter((_, i) => {
-        const pred = predictions[i];
-        return pred && pred[0] === r && pred[1] === c;
-      });
-
-      const count = matchingOrders.length;
-      const value =
-        count > 0
-          ? matchingOrders.reduce((s, o) => s + o.totalValue, 0) / count
-          : 0;
-
-      const canceledCount = matchingOrders.filter(
-        (o) => o.statusRaw === "canceled",
-      ).length;
-      const cancelRate =
-        count > 0 ? Math.round((canceledCount / count) * 1000) / 10 : 0;
-
-      const deliveredCount = matchingOrders.filter(
-        (o) => o.isAllDelivered === 1,
-      ).length;
-      const deliveryRate =
-        count > 0 ? Math.round((deliveredCount / count) * 1000) / 10 : 0;
-
-      const paymentMix = buildPaymentMix(matchingOrders);
-      const hourDistribution = buildHourDistribution(matchingOrders);
-      const dayDistribution = buildDayDistribution(matchingOrders);
-      const peakHour = count > 0 ? findPeakHour(hourDistribution) : 0;
-      const peakDay = count > 0 ? findPeakDay(dayDistribution) : "—";
-      const topProducts = buildTopProducts(matchingOrders, 3);
-
-      const label =
-        count > 0
-          ? `${count} pedido(s) neste quadrante. Ticket médio R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. Cancelamento: ${cancelRate}%. Entrega: ${deliveryRate}%.`
-          : "Quadrante vazio — nenhum cliente mapeado aqui.";
-
-      grid.push({
-        row: r,
-        col: c,
-        count,
-        value,
-        label,
-        cancelRate,
-        deliveryRate,
-        paymentMix,
-        peakHour,
-        peakDay,
-        topProducts,
-      });
-    }
-  }
-
-  return grid;
-}
-
 function buildStatuses(orders: ProcessedOrder[]): StatusDistribution[] {
   const map = new Map<string, number>();
   orders.forEach((o) => map.set(o.statusRaw, (map.get(o.statusRaw) ?? 0) + 1));
@@ -783,17 +647,17 @@ function generateProductClusterName(
 }
 
 function buildAnomalyProducts(
-  productKmeans: AnalysisResult["productKmeans"],
+  agrupamentoProdutos: AnalysisResult["agrupamentoProdutos"],
   productStats: AnalysisResult["diagnostics"]["productStats"],
 ): AnomalyProduct[] {
-  if (productKmeans.productKeys.length === 0) return [];
+  if (agrupamentoProdutos.productKeys.length === 0) return [];
 
   const statByKey = new Map(productStats.map((stat) => [stat.key, stat]));
-  const entries = productKmeans.productKeys.map((key, index) => ({
+  const entries = agrupamentoProdutos.productKeys.map((key, index) => ({
     key,
     stat: statByKey.get(key)!,
-    clusterId: productKmeans.clusters[index] ?? 0,
-    distance: productKmeans.distances[index] ?? 0,
+    clusterId: agrupamentoProdutos.clusters[index] ?? 0,
+    distance: agrupamentoProdutos.distances[index] ?? 0,
   }));
 
   const medianEffectiveQty = computeMedian(
@@ -801,7 +665,7 @@ function buildAnomalyProducts(
   );
 
   const clusterNames = new Map<number, string>();
-  [...new Set(productKmeans.clusters)].forEach((clusterId) => {
+  [...new Set(agrupamentoProdutos.clusters)].forEach((clusterId) => {
     const clusterProducts = entries
       .filter((entry) => entry.clusterId === clusterId)
       .map((entry) => entry.stat);
@@ -815,7 +679,7 @@ function buildAnomalyProducts(
     .map(({ key, stat, clusterId, distance }) => {
       const anomalyScore =
         Math.round(
-          percentileRank(productKmeans.distances, distance) * 1000,
+          percentileRank(agrupamentoProdutos.distances, distance) * 1000,
         ) / 10;
 
       return {
@@ -840,9 +704,8 @@ export function mapAnalysisResultToDashboard(
   const {
     orders,
     customerProfiles,
-    kmeans,
-    som,
-    productKmeans,
+    agrupamento,
+    agrupamentoProdutos,
     diagnostics,
     customerIntelligence,
     normalizationMeta,
@@ -866,13 +729,13 @@ export function mapAnalysisResultToDashboard(
   const clusters = buildCustomerClusters(
     customerProfiles,
     orders,
-    kmeans.clusters,
+    agrupamento.clusters,
     receitaTotal,
     segmentNames,
   );
 
-  const bestSilhouettePoint = kmeans.silhouetteAnalysis.find(
-    (p) => p.k === kmeans.bestK,
+  const bestSilhouettePoint = agrupamento.silhouetteAnalysis.find(
+    (p) => p.k === agrupamento.bestK,
   );
   const bestSilhouetteScore = bestSilhouettePoint?.score ?? 0;
 
@@ -922,7 +785,7 @@ export function mapAnalysisResultToDashboard(
   const allStrategies = buildAllStrategies(diagnostics.strategies);
   const clusterRisks = buildClusterRisks(clusters);
   const productAnomalies = buildAnomalyProducts(
-    productKmeans,
+    agrupamentoProdutos,
     diagnostics.productStats,
   );
 
@@ -941,31 +804,24 @@ export function mapAnalysisResultToDashboard(
       taxaEntrega,
       errosWorkflow,
       totalPedidos,
-      totalClusters: kmeans.bestK,
+      totalClusters: agrupamento.bestK,
       totalClientes: customerProfiles.length,
       receitaEmRisco: customerIntelligence.summary.revenueAtRisk,
       clvTotal: customerIntelligence.summary.totalClv,
     },
     clusters,
-    centroids: buildCentroids(kmeans.centroids),
+    centroids: buildCentroids(agrupamento.centroids),
     denormalizedCentroids: buildDenormalizedCentroids(
-      kmeans.centroids,
+      agrupamento.centroids,
       mins,
       maxs,
       orders,
     ),
-    elbowCurve: kmeans.elbowAnalysis,
-    silhouetteCurve: kmeans.silhouetteAnalysis,
+    elbowCurve: agrupamento.elbowAnalysis,
+    silhouetteCurve: agrupamento.silhouetteAnalysis,
     bestSilhouetteScore,
-    elbowK: kmeans.elbowK,
-    paymentMethodsK: kmeans.paymentMethodsK,
-    somGrid: buildSomGrid(
-      customerProfiles,
-      som.predictions,
-      som.gridX,
-      som.gridY,
-      receitaTotal,
-    ),
+    elbowK: agrupamento.elbowK,
+    paymentMethodsK: agrupamento.paymentMethodsK,
     operationalHours,
     operationalDays,
     statuses,
@@ -985,8 +841,9 @@ export function mapAnalysisResultToDashboard(
     churnScores: customerIntelligence.churnScores,
     clvEstimates: customerIntelligence.clvEstimates,
     revenueOpportunities: customerIntelligence.revenueOpportunities,
-    affinityRules: customerIntelligence.affinityRules,
-    migrationFlows: customerIntelligence.migrationFlows,
+    productIntelligence: result.productIntelligence,
+    bcgMatrix: result.bcgMatrix,
+    catalogHealth: result.catalogHealth,
     executiveInsights: customerIntelligence.executiveInsights,
     customerIntelligenceSummary: customerIntelligence.summary,
   };
