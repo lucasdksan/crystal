@@ -11,7 +11,7 @@ export interface SilhouettePoint {
   score: number;
 }
 
-export interface KmeansResult {
+export interface AgrupamentoResult {
   clusters: number[];
   centroids: number[][];
   orderDistances: number[];
@@ -22,13 +22,7 @@ export interface KmeansResult {
   paymentMethodsK: number;
 }
 
-export interface SomResult {
-  predictions: [number, number][];
-  gridX: number;
-  gridY: number;
-}
-
-export interface ProductKmeansResult {
+export interface ProductAgrupamentoResult {
   productKeys: string[];
   clusters: number[];
   distances: number[];
@@ -125,14 +119,103 @@ export interface NormalizationMeta {
   maxs: number[];
 }
 
+export interface ProductClusterProduct {
+  productKey: string;
+  name: string;
+  revenue: number;
+  totalOrders: number;
+  cancellationRate: number;
+}
+
+export interface ProductCluster {
+  id: number;
+  name: string;
+  products: ProductClusterProduct[];
+  totalRevenue: number;
+  revenueShare: number;
+  productCount: number;
+  averageCancellationRate: number;
+}
+
+export type ProductDiagnosticType =
+  | "champion"
+  | "dependency"
+  | "risk"
+  | "long_tail"
+  | "opportunity";
+
+export type ProductDiagnosticSeverity = "info" | "warning" | "critical";
+
+export interface ProductDiagnostic {
+  type: ProductDiagnosticType;
+  title: string;
+  message: string;
+  severity: ProductDiagnosticSeverity;
+}
+
+export interface ProductIntelligenceResult {
+  clusters: ProductCluster[];
+  diagnostics: ProductDiagnostic[];
+  totalProducts: number;
+}
+
+export type BCGQuadrant = "star" | "cash_cow" | "question" | "dog";
+
+export interface BCGProduct {
+  productKey: string;
+  productName: string;
+  revenueShare: number;
+  growthRate: number;
+  quadrant: BCGQuadrant;
+  revenue: number;
+  totalOrders: number;
+}
+
+export interface BCGMatrixResult {
+  products: BCGProduct[];
+  medianRevenueShare: number;
+  medianGrowthRate: number;
+  quadrantCounts: Record<BCGQuadrant, number>;
+}
+
+export interface CatalogHealthProduct {
+  productKey: string;
+  productName: string;
+  revenue: number;
+  totalOrders: number;
+  daysSinceLastSale?: number;
+  growthRate?: number;
+}
+
+export interface CatalogHealthResult {
+  noSale30Days: CatalogHealthProduct[];
+  noSale60Days: CatalogHealthProduct[];
+  noSale90Days: CatalogHealthProduct[];
+  singleSaleProducts: CatalogHealthProduct[];
+  paretoProducts: CatalogHealthProduct[];
+  decliningProducts: CatalogHealthProduct[];
+  growingProducts: CatalogHealthProduct[];
+  summary: {
+    totalProducts: number;
+    paretoCount: number;
+    paretoRevenueShare: number;
+    singleSaleCount: number;
+    noSale90Count: number;
+    decliningCount: number;
+    growingCount: number;
+  };
+}
+
 export interface AnalysisResult {
   orders: ProcessedOrder[];
   customerProfiles: CustomerProfile[];
-  kmeans: KmeansResult;
-  som: SomResult;
-  productKmeans: ProductKmeansResult;
+  agrupamento: AgrupamentoResult;
+  agrupamentoProdutos: ProductAgrupamentoResult;
   diagnostics: DiagnosticsResult;
   customerIntelligence: CustomerIntelligenceResult;
+  productIntelligence: ProductIntelligenceResult;
+  bcgMatrix: BCGMatrixResult;
+  catalogHealth: CatalogHealthResult;
   normalizationMeta: NormalizationMeta;
 }
 
