@@ -21,15 +21,219 @@ function getGeminiModel(): string {
   return process.env.GEMINI_MODEL?.trim() || DEFAULT_GEMINI_MODEL;
 }
 
-function buildSystemPrompt(dashboardState: DashboardData): string {
-  const { overview, clusters, diagnostics } = dashboardState;
+function formatCurrency(value: number): string {
+  return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
+}
+
+function buildKmeansContext(dashboardState: DashboardData): string {
+  const {
+    overview,
+    clusters,
+    denormalizedCentroids,
+    elbowCurve,
+    silhouetteCurve,
+    bestSilhouetteScore,
+    elbowK,
+    paymentMethodsK,
+  } = dashboardState;
+
+  const elbowSummary = elbowCurve
+    .slice(0, 6)
+    .map((p) => `K=${p.k}: WCSS ${p.wcss.toFixed(2)}`)
+    .join(", ");
+  const silhouetteSummary = silhouetteCurve
+    .slice(0, 6)
+    .map((p) => `K=${p.k}: ${p.score.toFixed(3)}`)
+    .join(", ");
+
+  const centroidsSummary = denormalizedCentroids
+    .map(
+      (c) =>
+        `- Cluster ${c.clusterId}: ticket ${formatCurrency(c.valorTotal)}, ${c.totalItens} itens, pagamento ${c.pagamento}, hora ${c.horaDoDia}h, dia ${c.diaDaSemana}`,
+    )
+    .join("\n");
 
   const clusterSummary = clusters
     .map(
       (c) =>
-        `- ${c.name}: ${c.count} pedidos (${c.percentage}%), ticket médio R$ ${c.averageValue.toFixed(2)}, cancelamento ${c.cancelRate}%, receita ${c.revenueShare}% da loja, pagamento via ${c.payment}, entrega ${c.deliveryRate.toFixed(0)}%.${c.topProducts.length > 0 ? ` Top produto: ${c.topProducts[0].name}.` : ""}`,
+        `- ${c.name}: ${c.count} clientes (${c.percentage}%), ticket médio ${formatCurrency(c.averageValue)}, cancelamento ${c.cancelRate}%, receita ${c.revenueShare}% da loja, pagamento via ${c.payment}, entrega ${c.deliveryRate.toFixed(0)}%, frequência ${c.averageFrequency?.toFixed(1) ?? "—"}/mês.${c.topProducts.length > 0 ? ` Top produto: ${c.topProducts[0].name}.` : ""}`,
     )
     .join("\n");
+
+  return `=== K-MEANS (Segmentação de Clientes) ===
+- K ótimo (curva do cotovelo): ${elbowK} | K por métodos de pagamento: ${paymentMethodsK}
+- K selecionado: ${overview.totalClusters} | Score de Silhueta: ${bestSilhouetteScore.toFixed(3)}
+- Curva do Cotovelo: ${elbowSummary || "não disponível"}
+- Curva de Silhueta: ${silhouetteSummary || "não disponível"}
+
+Centróides desnormalizados (perfil médio de cada cluster):
+${centroidsSummary || "Não disponível"}
+
+Resumo dos clusters:
+${clusterSummary || "Nenhum cluster identificado."}`;
+}
+
+function buildSomContext(dashboardState: DashboardData): string {
+  const activeNeurons = dashboardState.somGrid
+    .filter((n) => n.count > 0)
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8);
+
+  if (activeNeurons.length === 0) {
+    return "=== MAPA SOM (Self-Organizing Map) ===\nNenhum quadrante com clientes mapeados.";
+  }
+
+  const neuronsSummary = activeNeurons
+    .map(
+      (n) =>
+        `- Quadrante [${n.row},${n.col}]: ${n.count} cliente(s), ticket médio ${formatCurrency(n.value)}, ${(n.revenueShare ?? 0).toFixed(1)}% receita, pico ${n.peakHour}h, cancel ${n.cancelRate}%, entrega ${n.deliveryRate}%`,
+    )
+    .join("\n");
+
+  return `=== MAPA SOM (Self-Organizing Map) ===
+O SOM mapeia clientes em um grid 2D por similaridade comportamental.
+Quadrantes mais ocupados:
+${neuronsSummary}`;
+}
+
+function buildCustomerIntelligenceContext(dashboardState: DashboardData): string {
+  const {
+    customerSegments,
+    churnScores,
+    clvEstimates,
+    revenueOpportunities,
+    affinityRules,
+    migrationFlows,
+    executiveInsights,
+    customerIntelligenceSummary,
+    overview,
+  } = dashboardState;
+
+  const segmentsSummary = customerSegments
+    .map(
+      (s) =>
+        `- ${s.name}: ${s.customerCount} clientes (${s.customerShare.toFixed(1)}%), receita ${s.revenueShare.toFixed(1)}%, ticket médio ${formatCurrency(s.averageTicket)}, freq ${s.averageFrequency.toFixed(1)}/mês, ${s.averageDaysSinceLastPurchase}d desde última compra`,
+    )
+    .join("\n");
+
+  const churnSummary = churnScores
+    .slice(0, 5)
+    .map(
+      (c) =>
+        `- ${c.customerName}: score ${c.score.toFixed(0)}, risco ${c.riskLevel}, receita em risco ${formatCurrency(c.estimatedLostRevenue)}, ${c.daysSinceLastPurchase}d sem comprar`,
+    )
+    .join("\n");
+
+  const clvSummary = [...clvEstimates]
+    .sort((a, b) => b.estimatedLifetimeValue - a.estimatedLifetimeValue)
+    .slice(0, 5)
+    .map(
+      (c) =>
+        `- ${c.customerName} (${c.segmentName}): CLV ${formatCurrency(c.estimatedLifetimeValue)}, receita atual ${formatCurrency(c.currentRevenue)}, projeção 6m ${formatCurrency(c.predictedRevenue6m)}`,
+    )
+    .join("\n");
+
+  const opportunitiesSummary = revenueOpportunities
+    .map(
+      (o) =>
+        `- ${o.title}: ${formatCurrency(o.estimatedValue)} (${o.customerCount} clientes) — ${o.description}`,
+    )
+    .join("\n");
+
+  const affinitySummary = affinityRules
+    .slice(0, 5)
+    .map(
+      (r) =>
+        `- Se compra "${r.antecedent}" → provável "${r.consequent}" (confiança ${(r.confidence * 100).toFixed(0)}%, lift ${r.lift.toFixed(2)})`,
+    )
+    .join("\n");
+
+  const migrationSummary = migrationFlows
+    .slice(0, 5)
+    .map(
+      (m) =>
+        `- ${m.fromSegment} → ${m.toSegment}: ${m.customerCount} clientes, impacto ${formatCurrency(m.revenueImpact)}`,
+    )
+    .join("\n");
+
+  const insightsSummary = executiveInsights
+    .slice(0, 5)
+    .map(
+      (i) =>
+        `- [${i.priority}] ${i.text} (impacto ${formatCurrency(i.financialImpact)}, categoria: ${i.category})`,
+    )
+    .join("\n");
+
+  return `=== CUSTOMER INTELLIGENCE (Modelos de Negócio) ===
+Resumo financeiro:
+- CLV Total: ${formatCurrency(customerIntelligenceSummary.totalClv)}
+- Receita em Risco (churn): ${formatCurrency(customerIntelligenceSummary.revenueAtRisk)}
+- Receita Recuperável: ${formatCurrency(customerIntelligenceSummary.recoverableRevenue)}
+- Receita Incremental: ${formatCurrency(customerIntelligenceSummary.incrementalRevenue)}
+- Total Clientes: ${overview.totalClientes}
+
+Segmentos de clientes:
+${segmentsSummary || "Nenhum segmento identificado."}
+
+Top clientes em risco de churn:
+${churnSummary || "Nenhum cliente crítico identificado."}
+
+Top CLV (Lifetime Value):
+${clvSummary || "Sem estimativas de CLV."}
+
+Oportunidades de receita:
+${opportunitiesSummary || "Nenhuma oportunidade calculada."}
+
+Regras de afinidade de produtos (market basket):
+${affinitySummary || "Sem regras de afinidade significativas."}
+
+Fluxos de migração entre segmentos:
+${migrationSummary || "Sem fluxos de migração detectados."}
+
+Executive Insights:
+${insightsSummary || "Sem insights executivos."}`;
+}
+
+function buildProductMlContext(dashboardState: DashboardData): string {
+  const { productAnomalies, products } = dashboardState;
+
+  const anomaliesSummary = productAnomalies
+    .slice(0, 5)
+    .map(
+      (p) =>
+        `- ${p.name} (${p.clusterName}): score anomalia ${p.anomalyScore}, cancel ${(p.cancellationRate * 100).toFixed(0)}%, receita ${formatCurrency(p.revenue)}, ação: ${p.action}`,
+    )
+    .join("\n");
+
+  const topProducts = products
+    .slice(0, 5)
+    .map(
+      (p) => `- ${p.name}: ${p.quantity} un, ${formatCurrency(p.revenue)}`,
+    )
+    .join("\n");
+
+  return `=== K-MEANS DE PRODUTOS (Detecção de Anomalias) ===
+${anomaliesSummary || "Nenhuma anomalia de produto detectada."}
+
+Top produtos por receita:
+${topProducts || "Sem dados de produtos."}`;
+}
+
+function buildOperationalContext(dashboardState: DashboardData): string {
+  const peakHour = dashboardState.operationalHours.reduce(
+    (best, current) => (current.count > best.count ? current : best),
+    { hour: "0h", count: 0 },
+  );
+  const peakDay = dashboardState.operationalDays.reduce(
+    (best, current) => (current.count > best.count ? current : best),
+    { day: "—", count: 0 },
+  );
+
+  return `Horário de pico: ${peakHour.hour} (${peakHour.count} pedidos) | Dia de pico: ${peakDay.day} (${peakDay.count} pedidos)`;
+}
+
+function buildSystemPrompt(dashboardState: DashboardData): string {
+  const { overview, diagnostics } = dashboardState;
 
   const clusterRiskSummary = diagnostics.clusterRisks
     .slice(0, 3)
@@ -47,36 +251,58 @@ function buildSystemPrompt(dashboardState: DashboardData): string {
     )
     .join("\n");
 
-  return `Você é o "Crystal Copilot", um consultor de negócios especializado em e-commerce, análise de dados de vendas (K-Means, mapas SOM) e mentoria comercial.
-Seu objetivo principal é explicar termos complexos (como clusters, centróides, mapa SOM, score de silhueta) de forma extremamente simples, didática, amigável e descontraída em PORTUGUÊS (PT-BR) para um lojista totalmente leigo em programação e estatística.
+  const riskSummary = diagnostics.risks
+    .slice(0, 3)
+    .map((r) => `- ${r.product}: ${r.type} (${r.gravity})`)
+    .join("\n");
 
-Dados atuais da loja:
-- Faturamento Total: R$ ${overview.receitaTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
-- Ticket Médio: R$ ${overview.ticketMedio.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}
+  return `Você é o "Crystal Copilot", um consultor de negócios especializado em e-commerce, análise de dados de vendas e mentoria comercial.
+Seu objetivo principal é explicar termos complexos (clusters, centróides, mapa SOM, curva do cotovelo, score de silhueta, churn, CLV, afinidade de produtos) de forma extremamente simples, didática, amigável e descontraída em PORTUGUÊS (PT-BR) para um lojista totalmente leigo em programação e estatística.
+
+Você tem acesso aos resultados completos dos modelos de Machine Learning executados sobre os dados reais da loja. Use SEMPRE esses dados numéricos nas respostas — nunca invente métricas.
+
+=== VISÃO GERAL DA LOJA ===
+- Faturamento Total: ${formatCurrency(overview.receitaTotal)}
+- Ticket Médio: ${formatCurrency(overview.ticketMedio)}
 - Taxa de Cancelamento: ${overview.taxaCancelamento.toFixed(1)}%${overview.taxaCancelamento > 50 ? " (CRÍTICO!)" : ""}
 - Taxa de Entrega: ${overview.taxaEntrega.toFixed(1)}%
 - Total de Pedidos: ${overview.totalPedidos}
-- Total de Clusters: ${overview.totalClusters}
-- Score de Silhueta do K selecionado: ${dashboardState.bestSilhouetteScore.toFixed(3)}
+- Total de Clientes: ${overview.totalClientes}
+- CLV Total Estimado: ${formatCurrency(overview.clvTotal)}
+- Receita em Risco: ${formatCurrency(overview.receitaEmRisco)}
+- ${buildOperationalContext(dashboardState)}
 
-Resumo dos Clusters (com métricas comerciais):
-${clusterSummary}
+${buildKmeansContext(dashboardState)}
+
+${buildSomContext(dashboardState)}
+
+${buildCustomerIntelligenceContext(dashboardState)}
+
+${buildProductMlContext(dashboardState)}
+
+=== DIAGNOSTICS ESTRATÉGICO ===
+Resumo executivo: ${diagnostics.summary}
+Produto campeão: ${diagnostics.championProduct}
+Produto gargalo: ${diagnostics.bottleneckProduct}
 
 Clusters de maior risco:
 ${clusterRiskSummary || "Nenhum cluster de risco crítico identificado."}
 
-Estratégias prioritárias do Diagnostics:
-${strategySummary || "Nenhuma estratégia adicional disponível."}
+Riscos de produto:
+${riskSummary || "Nenhum risco de produto identificado."}
 
-Produto campeão: ${diagnostics.championProduct}
-Produto gargalo: ${diagnostics.bottleneckProduct}
+Estratégias prioritárias:
+${strategySummary || "Nenhuma estratégia adicional disponível."}
 
 Diretrizes:
 1. Responda educadamente, focando no crescimento do lojista.
 2. Explique os termos como se estivesse conversando com um amigo que tem uma lojinha física.
-3. Destaque ações práticas segmentadas por cluster (ex: desativar boleto só no cluster de risco, campanha PIX no horário de pico do cluster saudável).
-4. Cruze informações de clusters com estratégias do Diagnostics quando relevante.
-5. Mantenha os textos curtos e divididos em parágrafos legíveis.`;
+3. Cite números reais dos modelos ML (clusters, churn scores, CLV, afinidade, SOM) ao dar recomendações.
+4. Cruze informações entre K-Means, SOM, Customer Intelligence e Diagnostics quando relevante.
+5. Destaque ações práticas segmentadas (ex: campanha de retenção para clientes em churn crítico, cross-sell via regras de afinidade, migração de segmentos).
+6. Mantenha os textos curtos e divididos em parágrafos legíveis.
+7. Use formatação markdown (títulos, negrito, listas) — ela será renderizada corretamente.
+   Prefira ### para títulos de seção, ** para termos-chave e listas numeradas para ações passo a passo.`;
 }
 
 function buildKeywordFallback(
@@ -141,28 +367,231 @@ ${setupNote}`;
   }
 
   if (msg.includes("som") || msg.includes("mapa") || msg.includes("neur")) {
+    const activeNeurons = dashboardState.somGrid
+      .filter((n) => n.count > 0)
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 3);
+
+    const neuronTexts =
+      activeNeurons.length > 0
+        ? activeNeurons
+            .map(
+              (n) =>
+                `* Quadrante [${n.row},${n.col}]: ${n.count} cliente(s), ticket médio ${formatCurrency(n.value)}`,
+            )
+            .join("\n")
+        : "* Ainda não há clientes mapeados no grid SOM.";
+
     return `🗺️ **O que é o Mapa SOM (Self-Organizing Map)?**
 
 Imagine um tabuleiro onde cada cliente ocupa uma casinha de acordo com o quanto se parece com os vizinhos. Clientes parecidos ficam próximos!
 
-* **Casas vazias**: Comportamentos que sua loja nunca registrou.
-* **Casas cheias com vermelho**: Zona de alto risco (muitos cancelamentos concentrados).
-* **Casas cheias com verde**: Zona saudável de pagamento imediato.
+${neuronTexts}
 
 O SOM complementa o K-Means mostrando visualmente *onde* cada grupo está no espectro de comportamento.
 
 ${setupNote}`;
   }
 
+  if (
+    msg.includes("churn") ||
+    msg.includes("risco") ||
+    msg.includes("inativ")
+  ) {
+    const topChurn = dashboardState.churnScores.slice(0, 3);
+    const churnTexts =
+      topChurn.length > 0
+        ? topChurn
+            .map(
+              (c) =>
+                `* **${c.customerName}**: risco ${c.riskLevel}, score ${c.score.toFixed(0)}, ${c.daysSinceLastPurchase}d sem comprar, receita em risco ${formatCurrency(c.estimatedLostRevenue)}`,
+            )
+            .join("\n")
+        : "* Nenhum cliente em risco crítico identificado no momento.";
+
+    return `🛡️ **Análise de Churn Risk**
+
+Receita total em risco: **${formatCurrency(dashboardState.customerIntelligenceSummary.revenueAtRisk)}**
+
+Clientes mais críticos:
+${churnTexts}
+
+**Ações sugeridas:**
+1. Contate clientes em risco alto/crítico com oferta personalizada.
+2. Ative régua de reativação para quem está há mais de 90 dias sem comprar.
+3. Monitore a migração entre segmentos para detectar deterioração precoce.
+
+${setupNote}`;
+  }
+
+  if (
+    msg.includes("clv") ||
+    msg.includes("ltv") ||
+    msg.includes("lifetime") ||
+    msg.includes("valor vital")
+  ) {
+    const topClv = [...dashboardState.clvEstimates]
+      .sort((a, b) => b.estimatedLifetimeValue - a.estimatedLifetimeValue)
+      .slice(0, 3);
+
+    const clvTexts =
+      topClv.length > 0
+        ? topClv
+            .map(
+              (c) =>
+                `* **${c.customerName}** (${c.segmentName}): CLV ${formatCurrency(c.estimatedLifetimeValue)}, projeção 6m ${formatCurrency(c.predictedRevenue6m)}`,
+            )
+            .join("\n")
+        : "* Sem estimativas de CLV disponíveis.";
+
+    return `👑 **Customer Lifetime Value (CLV)**
+
+CLV total estimado da base: **${formatCurrency(dashboardState.overview.clvTotal)}**
+
+Top clientes por valor vitalício:
+${clvTexts}
+
+**Ações sugeridas:**
+1. Proteja clientes VIP com programa de fidelidade.
+2. Invista em upsell nos clientes de alto potencial.
+3. Use o CLV para priorizar orçamento de retenção vs. aquisição.
+
+${setupNote}`;
+  }
+
+  if (
+    msg.includes("afinidade") ||
+    msg.includes("cross") ||
+    msg.includes("kit") ||
+    msg.includes("comprou junto")
+  ) {
+    const rules = dashboardState.affinityRules.slice(0, 3);
+    const ruleTexts =
+      rules.length > 0
+        ? rules
+            .map(
+              (r) =>
+                `* Quem compra **${r.antecedent}** também tende a comprar **${r.consequent}** (confiança ${(r.confidence * 100).toFixed(0)}%, lift ${r.lift.toFixed(2)})`,
+            )
+            .join("\n")
+        : "* Sem regras de afinidade significativas detectadas.";
+
+    return `🔗 **Afinidade de Produtos (Market Basket)**
+
+Regras de associação encontradas pelo modelo:
+${ruleTexts}
+
+**Ações sugeridas:**
+1. Crie kits com produtos de alta afinidade.
+2. Configure recomendações "compre junto" no checkout.
+3. Use lift alto para campanhas de cross-sell segmentadas.
+
+${setupNote}`;
+  }
+
+  if (msg.includes("migra") || msg.includes("segmento")) {
+    const flows = dashboardState.migrationFlows.slice(0, 3);
+    const flowTexts =
+      flows.length > 0
+        ? flows
+            .map(
+              (f) =>
+                `* ${f.fromSegment} → ${f.toSegment}: ${f.customerCount} clientes, impacto ${formatCurrency(f.revenueImpact)}`,
+            )
+            .join("\n")
+        : "* Sem fluxos de migração significativos detectados.";
+
+    const segmentTexts = dashboardState.customerSegments
+      .map(
+        (s) =>
+          `* **${s.name}**: ${s.customerCount} clientes (${s.customerShare.toFixed(1)}%), receita ${s.revenueShare.toFixed(1)}%`,
+      )
+      .join("\n");
+
+    return `🔀 **Segmentação e Migração de Clientes**
+
+Segmentos atuais:
+${segmentTexts || "* Nenhum segmento identificado."}
+
+Fluxos de migração detectados:
+${flowTexts}
+
+**Ações sugeridas:**
+1. Investigue migrações negativas (VIP → em risco).
+2. Replique estratégias dos segmentos com maior receita.
+3. Crie campanhas para mover clientes de alto potencial para VIP.
+
+${setupNote}`;
+  }
+
+  if (
+    msg.includes("oportunidade") ||
+    msg.includes("receita incremental") ||
+    msg.includes("recuper")
+  ) {
+    const opportunities = dashboardState.revenueOpportunities;
+    const oppTexts =
+      opportunities.length > 0
+        ? opportunities
+            .map(
+              (o) =>
+                `* **${o.title}**: ${formatCurrency(o.estimatedValue)} (${o.customerCount} clientes) — ${o.description}`,
+            )
+            .join("\n")
+        : "* Nenhuma oportunidade calculada no momento.";
+
+    return `💰 **Oportunidades de Receita**
+
+Receita recuperável: **${formatCurrency(dashboardState.customerIntelligenceSummary.recoverableRevenue)}**
+Receita incremental: **${formatCurrency(dashboardState.customerIntelligenceSummary.incrementalRevenue)}**
+
+Oportunidades identificadas:
+${oppTexts}
+
+${setupNote}`;
+  }
+
+  if (
+    msg.includes("anomalia") ||
+    msg.includes("produto") ||
+    msg.includes("gargalo")
+  ) {
+    const anomalies = dashboardState.productAnomalies.slice(0, 3);
+    const anomalyTexts =
+      anomalies.length > 0
+        ? anomalies
+            .map(
+              (p) =>
+                `* **${p.name}** (${p.clusterName}): score ${p.anomalyScore}, ação ${p.action}`,
+            )
+            .join("\n")
+        : `* Produto gargalo: **${dashboardState.diagnostics.bottleneckProduct}**`;
+
+    return `📦 **Análise de Produtos (K-Means)**
+
+Produto campeão: **${dashboardState.diagnostics.championProduct}**
+Produto gargalo: **${dashboardState.diagnostics.bottleneckProduct}**
+
+Anomalias detectadas:
+${anomalyTexts}
+
+${setupNote}`;
+  }
+
   return `👋 **Olá! Sou o Crystal Copilot, seu mentor de vendas.**
 
-Estou analisando seu e-commerce agora. Vejo que sua loja tem **${dashboardState.overview.totalPedidos} pedidos** e taxa de cancelamento de **${overview.taxaCancelamento.toFixed(1)}%**.
+Estou analisando seu e-commerce agora:
+* **${dashboardState.overview.totalClientes} clientes** em **${dashboardState.overview.totalClusters} clusters**
+* **${dashboardState.overview.totalPedidos} pedidos** · cancelamento **${overview.taxaCancelamento.toFixed(1)}%**
+* CLV total: **${formatCurrency(dashboardState.overview.clvTotal)}**
 
 Posso ajudar com:
-* **"como reduzir cancelamento"** — plano de ação tático
-* **"explicar clusters"** — quem são seus compradores
-* **"meio de pagamento"** — alternativas de faturamento imediato
-* **"o que é SOM"** — explicação do mapa de comportamento
+* **"explicar clusters"** — segmentação K-Means
+* **"churn risk"** — clientes em risco de abandono
+* **"CLV"** — valor vitalício dos clientes
+* **"afinidade"** — produtos comprados juntos
+* **"oportunidades"** — receita recuperável e incremental
+* **"o que é SOM"** — mapa de comportamento
 
 ${setupNote}`;
 }
