@@ -22,11 +22,17 @@ describe("runAnalysis", () => {
     if (!response.success) return;
 
     expect(response.data.orders.length).toBe(fixtureVtexOrdersNormalized().length);
-    expect(response.data.kmeans.clusters).toHaveLength(response.data.orders.length);
-    expect(response.data.som.predictions).toHaveLength(response.data.orders.length);
+    expect(response.data.customerProfiles.length).toBeGreaterThan(0);
+    expect(response.data.kmeans.clusters).toHaveLength(
+      response.data.customerProfiles.length,
+    );
+    expect(response.data.som.predictions).toHaveLength(
+      response.data.customerProfiles.length,
+    );
+    expect(response.data.customerIntelligence.segments.length).toBeGreaterThan(0);
     expect(response.data.diagnostics.strategies.length).toBeGreaterThan(0);
     expect(response.data.productKmeans).toBeDefined();
-    expect(response.data.normalizationMeta.mins).toHaveLength(9);
+    expect(response.data.normalizationMeta.mins.length).toBeGreaterThan(0);
   });
 
   it("forwards analysis options to fetchVtexOrders", async () => {

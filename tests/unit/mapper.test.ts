@@ -2,30 +2,40 @@ import { describe, expect, it } from "vitest";
 import { mapAnalysisResultToDashboard } from "@/frontend/lib/mapper";
 import { buildDiagnostics } from "@/backend/services/diagnostics.service";
 import {
-  buildFeatureVectors,
+  buildCustomerFeatureVectors,
   processOrders,
 } from "@/backend/services/normalization.service";
-import { runKmeans } from "@/backend/services/kmeans.service";
+import { runCustomerKmeans } from "@/backend/services/kmeans.service";
 import { runSom } from "@/backend/services/som.service";
 import { runProductKmeans } from "@/backend/services/product-kmeans.service";
+import { aggregateByCustomer } from "@/backend/services/customer-aggregation.service";
+import { runCustomerIntelligence } from "@/backend/services/customer-intelligence.service";
 import type { AnalysisResult } from "@/backend/types/analysis";
 import { fixtureVtexOrdersNormalized } from "../fixtures/vtex-orders";
 
 function buildAnalysisResult(): AnalysisResult {
   const rawList = fixtureVtexOrdersNormalized();
   const orders = processOrders(rawList);
-  const { normalizedVectors, mins, maxs } = buildFeatureVectors(orders);
-  const kmeans = runKmeans(normalizedVectors);
+  const customerProfiles = aggregateByCustomer(orders);
+  const { normalizedVectors, mins, maxs, uniquePaymentMethods } =
+    buildCustomerFeatureVectors(customerProfiles);
+  const kmeans = runCustomerKmeans(normalizedVectors, uniquePaymentMethods);
   const som = runSom(normalizedVectors);
   const diagnostics = buildDiagnostics(rawList);
   const productKmeans = runProductKmeans(diagnostics.productStats);
+  const customerIntelligence = runCustomerIntelligence(
+    customerProfiles,
+    kmeans,
+  );
 
   return {
     orders,
+    customerProfiles,
     kmeans,
     som,
     productKmeans,
     diagnostics,
+    customerIntelligence,
     normalizationMeta: { mins, maxs },
   };
 }
@@ -54,6 +64,8 @@ describe("mapper", () => {
       1,
     );
     expect(dashboard.overview.totalClusters).toBe(result.kmeans.bestK);
+    expect(dashboard.overview.totalClientes).toBe(result.customerProfiles.length);
+    expect(dashboard.customerSegments.length).toBeGreaterThan(0);
   });
 
   it("buildClusters output matches bestK with required fields", () => {

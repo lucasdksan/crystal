@@ -29,14 +29,13 @@ describe("normalization.service", () => {
   });
 
   describe("processOrders", () => {
-    it("encodes known enum values and maps unknown values to -1", () => {
+    it("maps unknown status to -1 and keeps payment as numeric placeholder", () => {
       const orders = processOrders(fixtureVtexOrdersNormalized());
       const unknownOrder = orders.find((order) => order.orderId === "order-006");
 
       expect(unknownOrder).toBeDefined();
-      expect(unknownOrder?.origin).toBe(-1);
-      expect(unknownOrder?.paymentNames).toBe(-1);
       expect(unknownOrder?.status).toBe(-1);
+      expect(unknownOrder?.paymentRaw).toBe("Forma Desconhecida");
     });
 
     it("assigns sequential sales channel codes", () => {

@@ -90,4 +90,74 @@ describe("sendChatMessage", () => {
     expect(generateContent).toHaveBeenCalledOnce();
     expect(response.text).toBe("Resposta da IA");
   });
+
+  it("includes ML results in Gemini system prompt", async () => {
+    process.env.GEMINI_API_KEY = "test-key";
+
+    const generateContent = vi.fn().mockResolvedValue({ text: "ok" });
+
+    vi.doMock("@google/genai", () => ({
+      GoogleGenAI: class MockGoogleGenAI {
+        models = { generateContent };
+
+        constructor(_: { apiKey: string }) {
+          void _;
+        }
+      },
+    }));
+
+    const sendChatMessage = await loadChatAction();
+
+    await sendChatMessage(
+      [{ id: "1", sender: "user", text: "explique churn", timestamp: "" }],
+      fixtureDashboardState,
+    );
+
+    const callArgs = generateContent.mock.calls[0][0];
+    const systemPrompt = callArgs.config.systemInstruction as string;
+
+    expect(systemPrompt).toContain("K-MEANS");
+    expect(systemPrompt).toContain("MAPA SOM");
+    expect(systemPrompt).toContain("CUSTOMER INTELLIGENCE");
+    expect(systemPrompt).toContain("Maria Silva");
+    expect(systemPrompt).toContain("Camiseta Premium");
+    expect(systemPrompt).toContain("Score de Silhueta");
+  });
+
+  it("uses keyword fallback for churn questions without Gemini", async () => {
+    const sendChatMessage = await loadChatAction();
+
+    const response = await sendChatMessage(
+      [{ id: "1", sender: "user", text: "quais clientes estão em churn?", timestamp: "" }],
+      fixtureDashboardState,
+    );
+
+    expect(response.text).toContain("Churn Risk");
+    expect(response.text).toContain("Maria Silva");
+  });
+
+  it("uses keyword fallback for CLV questions without Gemini", async () => {
+    const sendChatMessage = await loadChatAction();
+
+    const response = await sendChatMessage(
+      [{ id: "1", sender: "user", text: "quem tem maior CLV?", timestamp: "" }],
+      fixtureDashboardState,
+    );
+
+    expect(response.text).toContain("Lifetime Value");
+    expect(response.text).toContain("Ana Costa");
+  });
+
+  it("uses keyword fallback for affinity questions without Gemini", async () => {
+    const sendChatMessage = await loadChatAction();
+
+    const response = await sendChatMessage(
+      [{ id: "1", sender: "user", text: "regras de afinidade de produtos", timestamp: "" }],
+      fixtureDashboardState,
+    );
+
+    expect(response.text).toContain("Afinidade");
+    expect(response.text).toContain("Camiseta Premium");
+    expect(response.text).toContain("Boné Casual");
+  });
 });

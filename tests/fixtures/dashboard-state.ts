@@ -1,5 +1,104 @@
 import type { DashboardData } from "@/frontend/types/dashboard";
 
+const customerIntelligenceFixture = {
+  customerSegments: [
+    {
+      id: 0,
+      name: "Clientes VIP",
+      description: "Alto ticket e alta frequência",
+      customerCount: 2,
+      customerShare: 40,
+      revenueShare: 55,
+      averageTicket: 500,
+      averageFrequency: 3.5,
+      averageDaysSinceLastPurchase: 15,
+      totalRevenue: 6875,
+    },
+    {
+      id: 1,
+      name: "Clientes em Risco",
+      description: "Inativos com histórico de compra",
+      customerCount: 1,
+      customerShare: 20,
+      revenueShare: 10,
+      averageTicket: 150,
+      averageFrequency: 1.2,
+      averageDaysSinceLastPurchase: 120,
+      totalRevenue: 150,
+    },
+  ],
+  churnScores: [
+    {
+      customerId: "c1",
+      customerName: "Maria Silva",
+      score: 85,
+      riskLevel: "critico" as const,
+      estimatedLostRevenue: 350,
+      daysSinceLastPurchase: 150,
+      purchaseFrequency: 1.5,
+    },
+    {
+      customerId: "c2",
+      customerName: "João Santos",
+      score: 60,
+      riskLevel: "alto" as const,
+      estimatedLostRevenue: 150,
+      daysSinceLastPurchase: 90,
+      purchaseFrequency: 2,
+    },
+  ],
+  clvEstimates: [
+    {
+      customerId: "c3",
+      customerName: "Ana Costa",
+      currentRevenue: 2500,
+      predictedRevenue6m: 1800,
+      estimatedLifetimeValue: 8500,
+      segmentName: "Clientes VIP",
+    },
+  ],
+  revenueOpportunities: [
+    {
+      type: "recoverable",
+      title: "Reativação de inativos",
+      description: "Clientes sem compra há mais de 90 dias",
+      estimatedValue: 1200,
+      customerCount: 3,
+    },
+  ],
+  affinityRules: [
+    {
+      antecedent: "Camiseta Premium",
+      consequent: "Boné Casual",
+      support: 0.25,
+      confidence: 0.7,
+      lift: 2.1,
+    },
+  ],
+  migrationFlows: [
+    {
+      fromSegment: "Clientes Recorrentes",
+      toSegment: "Clientes em Risco",
+      customerCount: 2,
+      revenueImpact: 400,
+    },
+  ],
+  executiveInsights: [
+    {
+      text: "2 clientes VIP concentram 55% da receita",
+      financialImpact: 6875,
+      priority: "alta" as const,
+      category: "concentracao",
+    },
+  ],
+  customerIntelligenceSummary: {
+    recoverableRevenue: 1200,
+    incrementalRevenue: 800,
+    revenueAtRisk: 500,
+    totalClv: 15000,
+  },
+};
+
 export const fixtureDashboardState: DashboardData = {
   reportDate: "15/01/2025",
   reportId: "test-report",
@@ -11,6 +110,9 @@ export const fixtureDashboardState: DashboardData = {
     errosWorkflow: 1,
     totalPedidos: 8,
     totalClusters: 3,
+    totalClientes: 5,
+    receitaEmRisco: 500,
+    clvTotal: 15000,
   },
   clusters: [
     {
@@ -62,14 +164,71 @@ export const fixtureDashboardState: DashboardData = {
       topProducts: [{ name: "Camiseta Premium", quantity: 2, revenue: 150 }],
     },
   ],
-  centroids: [],
-  denormalizedCentroids: [],
-  elbowCurve: [{ k: 3, wcss: 1.2 }],
-  silhouetteCurve: [{ k: 3, score: 0.45 }],
+  centroids: [
+    {
+      clusterId: 0,
+      name: "Cluster 0",
+      valorTotal: 45,
+      totalItens: 30,
+      quantidadeTotal: 25,
+      precoMedio: 40,
+      origem: 0,
+      pagamento: 75,
+      horaDoDia: 50,
+      diaDaSemana: 30,
+      canalVendas: 10,
+    },
+  ],
+  denormalizedCentroids: [
+    {
+      clusterId: 0,
+      name: "Cluster 0",
+      valorTotal: 120,
+      totalItens: 1.5,
+      quantidadeTotal: 1.5,
+      precoMedio: 80,
+      origem: "Marketplace",
+      pagamento: "Pix",
+      horaDoDia: 14,
+      diaDaSemana: "Seg",
+      canalVendas: "Principal",
+    },
+  ],
+  elbowCurve: [
+    { k: 2, wcss: 2.5 },
+    { k: 3, wcss: 1.2 },
+  ],
+  silhouetteCurve: [
+    { k: 2, score: 0.35 },
+    { k: 3, score: 0.45 },
+  ],
   bestSilhouetteScore: 0.45,
-  somGrid: [],
-  operationalHours: [],
-  operationalDays: [],
+  elbowK: 3,
+  paymentMethodsK: 3,
+  somGrid: [
+    {
+      row: 0,
+      col: 1,
+      count: 3,
+      value: 120,
+      label: "3 clientes",
+      cancelRate: 10,
+      deliveryRate: 90,
+      paymentMix: { Pix: 100 },
+      peakHour: 14,
+      peakDay: "Seg",
+      topProducts: [],
+      revenueShare: 45,
+    },
+  ],
+  operationalHours: [
+    { hour: "14h", count: 3 },
+    { hour: "10h", count: 1 },
+  ],
+  operationalDays: [
+    { day: "Seg", count: 4 },
+    { day: "Ter", count: 2 },
+  ],
   statuses: [],
   products: [],
   productAnomalies: [],
@@ -103,4 +262,5 @@ export const fixtureDashboardState: DashboardData = {
       },
     ],
   },
+  ...customerIntelligenceFixture,
 };
