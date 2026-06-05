@@ -77,21 +77,6 @@ export interface RevenueOpportunity {
   customerCount: number;
 }
 
-export interface ProductAffinityRule {
-  antecedent: string;
-  consequent: string;
-  support: number;
-  confidence: number;
-  lift: number;
-}
-
-export interface MigrationFlow {
-  fromSegment: string;
-  toSegment: string;
-  customerCount: number;
-  revenueImpact: number;
-}
-
 export type InsightPriority = "alta" | "media" | "baixa";
 
 export interface ExecutiveInsight {
@@ -107,8 +92,6 @@ export interface CustomerIntelligenceResult {
   churnScores: ChurnScore[];
   clvEstimates: CLVEstimate[];
   revenueOpportunities: RevenueOpportunity[];
-  affinityRules: ProductAffinityRule[];
-  migrationFlows: MigrationFlow[];
   executiveInsights: ExecutiveInsight[];
   summary: {
     recoverableRevenue: number;
