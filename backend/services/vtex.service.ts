@@ -17,8 +17,19 @@ function centsToCurrency(value: number): number {
 }
 
 function normalizeOrderMonetaryValues(order: VtexOrder): VtexOrder {
+  const raw = order as VtexOrder & {
+    clientProfileData?: { email?: string; firstName?: string; lastName?: string };
+  };
+
   return {
     ...order,
+    clientEmail: raw.clientProfileData?.email?.trim() || order.clientEmail || "",
+    clientName:
+      order.clientName ||
+      [raw.clientProfileData?.firstName, raw.clientProfileData?.lastName]
+        .filter(Boolean)
+        .join(" ") ||
+      "Cliente",
     totalValue: centsToCurrency(order.totalValue),
     items: (order.items ?? []).map((item) => ({
       ...item,
