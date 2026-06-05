@@ -2,6 +2,8 @@
 
 import React, { useState, useRef, useEffect } from "react";
 import { motion } from "motion/react";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import type { ChatMessage, DashboardData } from "@/frontend/types/dashboard";
 import { sendChatMessage } from "@/backend/actions/chat";
 import {
@@ -25,10 +27,25 @@ function formatChatTime(date = new Date()) {
 }
 
 function buildWelcomeMessage(data: DashboardData): ChatMessage {
+  const hasChurn = data.churnScores.length > 0;
+  const hasClv = data.clvEstimates.length > 0;
+  const mlSummary = [
+    `**${data.overview.totalClientes} clientes** em **${data.overview.totalClusters} clusters** (K-Means)`,
+    `CLV total estimado: **R$ ${data.overview.clvTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`,
+    hasChurn
+      ? `receita em risco: **R$ ${data.overview.receitaEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`
+      : null,
+    hasClv && data.affinityRules.length > 0
+      ? `**${data.affinityRules.length} regras de afinidade** detectadas`
+      : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+
   return {
     id: "default",
     sender: "assistant",
-    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Estou aqui para traduzir este relatório de forma descomplicada!\n\nSua taxa de cancelamento está em **${data.overview.taxaCancelamento.toFixed(1)}%** e temos **${data.overview.totalPedidos} pedidos** analisados em **${data.overview.totalClusters} grupos** de comportamento.\n\nO que você gostaria de explorar hoje? Pode perguntar livremente ou clicar em um dos botões rápidos abaixo!`,
+    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Tenho acesso aos resultados dos modelos de ML desta análise — K-Means, SOM, churn, CLV, afinidade e mais.\n\n${mlSummary}\n\nTaxa de cancelamento: **${data.overview.taxaCancelamento.toFixed(1)}%** · **${data.overview.totalPedidos} pedidos** analisados.\n\nO que você gostaria de explorar? Pode perguntar livremente ou usar os atalhos abaixo!`,
     timestamp: formatChatTime(),
   };
 }
@@ -49,20 +66,28 @@ export function MentorChat({ data }: MentorChatProps) {
 
   const quickPrompts = [
     {
-      label: "💡 Como consertar cancelamentos?",
-      query: "Como reduzir cancelamento e perdas por boletos?",
-    },
-    {
-      label: "📊 O que indicam os clusters?",
+      label: "📊 Clusters K-Means",
       query: "Me explica de forma simples os clusters e o que eles significam para minha loja",
     },
     {
-      label: "🗺️ O que é o mapa de comportamento?",
-      query: "O que é o mapa de comportamento e como interpretar os quadrantes?",
+      label: "🛡️ Churn Risk",
+      query: "Quais clientes estão em risco de churn e o que devo fazer para retê-los?",
     },
     {
-      label: "💸 Meios de pagamento",
-      query: "Como os meios de pagamento estão interferindo no meu e-commerce?",
+      label: "👑 CLV",
+      query: "Quem são meus clientes mais valiosos e como proteger o CLV da minha base?",
+    },
+    {
+      label: "🔗 Afinidade",
+      query: "Quais produtos são comprados juntos e como montar kits de cross-sell?",
+    },
+    {
+      label: "🗺️ Mapa SOM",
+      query: "O que é o mapa de comportamento SOM e como interpretar os quadrantes?",
+    },
+    {
+      label: "💰 Oportunidades",
+      query: "Quais oportunidades de receita incremental e recuperável o modelo identificou?",
     },
   ];
 
@@ -107,32 +132,41 @@ export function MentorChat({ data }: MentorChatProps) {
     }
   };
 
-  const parseMarkdown = (text: string) => {
-    return text.split("\n").map((line, layoutIdx) => {
-      let formatted = line;
-      formatted = formatted.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-      formatted = formatted.replace(/\*(.*?)\*/g, "<strong>$1</strong>");
-
-      if (line.trim().startsWith("* ") || line.trim().startsWith("- ")) {
-        return (
-          <li
-            key={layoutIdx}
-            className="ml-4 list-disc text-xs md:text-sm text-slate-700 leading-relaxed font-sans"
-            dangerouslySetInnerHTML={{
-              __html: formatted.replace(/^[\*\-]\s+/, ""),
-            }}
-          />
-        );
-      }
-
-      return (
-        <p
-          key={layoutIdx}
-          className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans mb-1.5"
-          dangerouslySetInnerHTML={{ __html: formatted }}
-        />
-      );
-    });
+  const markdownComponents = {
+    h1: ({ children }: { children?: React.ReactNode }) => (
+      <h1 className="text-base font-extrabold text-slate-900 mt-3 mb-1">
+        {children}
+      </h1>
+    ),
+    h2: ({ children }: { children?: React.ReactNode }) => (
+      <h2 className="text-sm font-extrabold text-slate-800 mt-2.5 mb-1">
+        {children}
+      </h2>
+    ),
+    h3: ({ children }: { children?: React.ReactNode }) => (
+      <h3 className="text-sm font-bold text-slate-800 mt-2 mb-0.5">
+        {children}
+      </h3>
+    ),
+    p: ({ children }: { children?: React.ReactNode }) => (
+      <p className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans mb-1.5">
+        {children}
+      </p>
+    ),
+    ul: ({ children }: { children?: React.ReactNode }) => (
+      <ul className="list-disc ml-4 space-y-0.5 mb-1.5">{children}</ul>
+    ),
+    ol: ({ children }: { children?: React.ReactNode }) => (
+      <ol className="list-decimal ml-4 space-y-0.5 mb-1.5">{children}</ol>
+    ),
+    li: ({ children }: { children?: React.ReactNode }) => (
+      <li className="text-xs md:text-sm text-slate-700 leading-relaxed font-sans">
+        {children}
+      </li>
+    ),
+    strong: ({ children }: { children?: React.ReactNode }) => (
+      <strong className="font-bold text-slate-900">{children}</strong>
+    ),
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
@@ -149,12 +183,12 @@ export function MentorChat({ data }: MentorChatProps) {
           </div>
           <div>
             <h3 className="text-lg font-sans font-extrabold text-slate-900 leading-snug">
-              Seu Consultor de bolso em Segmentação & Comportamento
+              Seu Consultor de bolso em Customer Intelligence
             </h3>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-              Diferente de relatórios comuns onde você só vê gráficos e tabelas,
-              o <strong>Crystal Copilot</strong> foi treinado para explicar o
-              comportamento de cada grupo em termos humanos.
+              O <strong>Crystal Copilot</strong> acessa os resultados dos modelos
+              de ML — K-Means, SOM, churn, CLV, afinidade e migração — e traduz
+              tudo em recomendações comerciais práticas.
             </p>
           </div>
 
@@ -164,8 +198,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 1
               </span>
               <p>
-                Pergunte sobre conceitos complexos (como &quot;Curva de Cotovelo&quot; ou
-                &quot;Mapa de Comportamento&quot;).
+                Pergunte sobre clusters, churn, CLV, afinidade de produtos ou o
+                mapa SOM — com números reais da sua loja.
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
@@ -173,8 +207,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 2
               </span>
               <p>
-                Consulte táticas de escoamento para os produtos cancelados do
-                e-commerce.
+                Peça planos de retenção para clientes em risco ou cross-sell via
+                regras de afinidade.
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
@@ -182,7 +216,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 3
               </span>
               <p>
-                Fale sobre tendências e como programar novos meios de pagamento.
+                Explore oportunidades de receita incremental e migração entre
+                segmentos de clientes.
               </p>
             </div>
           </div>
@@ -259,7 +294,12 @@ export function MentorChat({ data }: MentorChatProps) {
                           {msg.text}
                         </p>
                       ) : (
-                        parseMarkdown(msg.text)
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm]}
+                          components={markdownComponents}
+                        >
+                          {msg.text}
+                        </ReactMarkdown>
                       )}
                     </div>
                   </div>
