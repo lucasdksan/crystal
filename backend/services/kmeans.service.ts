@@ -69,7 +69,11 @@ function findCandidates(data: number[][], maxK: number = MAX_K): KCandidate[] {
   for (let k = 1; k <= safeMaxK; k++) {
     const result = kmeans(data, k, {});
     const wcss = calculateWCSS(data, result.centroids, result.clusters);
-    const silhouette = calculateAverageSilhouette(data, result.clusters, result.centroids);
+    const silhouette = calculateAverageSilhouette(
+      data,
+      result.clusters,
+      result.centroids,
+    );
 
     results.push({ k, wcss, silhouette });
   }
@@ -94,6 +98,48 @@ function findOptimalKBySilhouette(candidates: KCandidate[]): number {
   return Math.min(best.k, candidates.length);
 }
 
+function findOptimalKByElbow(candidates: KCandidate[]): number {
+  if (candidates.length <= 2) return Math.min(MIN_K, candidates.length);
+
+  let maxDrop = -Infinity;
+  let elbowK = candidates[0].k;
+
+  for (let i = 1; i < candidates.length - 1; i++) {
+    const prevDrop = candidates[i - 1].wcss - candidates[i].wcss;
+    const nextDrop = candidates[i].wcss - candidates[i + 1].wcss;
+    const curvature = prevDrop - nextDrop;
+
+    if (curvature > maxDrop) {
+      maxDrop = curvature;
+      elbowK = candidates[i].k;
+    }
+  }
+
+  return Math.max(elbowK, MIN_K);
+}
+
+function resolveBestK(
+  candidates: KCandidate[],
+  uniquePaymentMethods: number,
+): number {
+  if (candidates.length === 0) return 1;
+
+  const elbowK = findOptimalKByElbow(candidates);
+  const silhouetteK = findOptimalKBySilhouette(candidates);
+  const paymentK = Math.min(
+    Math.max(uniquePaymentMethods, MIN_K),
+    candidates.length,
+  );
+
+  const candidateK = Math.max(
+    MIN_K,
+    Math.min(paymentK, Math.max(elbowK, silhouetteK)),
+  );
+
+  const match = candidates.find((c) => c.k === candidateK);
+  return match ? candidateK : silhouetteK;
+}
+
 function calculateOrderDistances(
   data: number[][],
   clusters: number[],
@@ -108,13 +154,31 @@ export function runKmeans(
   normalizedVectors: number[][],
   maxK: number = MAX_K,
 ): KmeansResult {
+  return runCustomerKmeans(normalizedVectors, MIN_K, maxK);
+}
+
+export function runCustomerKmeans(
+  normalizedVectors: number[][],
+  uniquePaymentMethods: number,
+  maxK: number = MAX_K,
+): KmeansResult {
   const safeMaxK = Math.min(maxK, normalizedVectors.length - 1);
   const candidates = findCandidates(normalizedVectors, safeMaxK);
 
-  const elbowAnalysis: ElbowPoint[] = candidates.map(({ k, wcss }) => ({ k, wcss }));
-  const silhouetteAnalysis: SilhouettePoint[] = candidates.map(({ k, silhouette }) => ({ k, score: silhouette }));
+  const elbowAnalysis: ElbowPoint[] = candidates.map(({ k, wcss }) => ({
+    k,
+    wcss,
+  }));
+  const silhouetteAnalysis: SilhouettePoint[] = candidates.map(
+    ({ k, silhouette }) => ({ k, score: silhouette }),
+  );
 
-  const bestK = findOptimalKBySilhouette(candidates);
+  const elbowK = findOptimalKByElbow(candidates);
+  const paymentMethodsK = Math.min(
+    Math.max(uniquePaymentMethods, MIN_K),
+    candidates.length || MIN_K,
+  );
+  const bestK = resolveBestK(candidates, uniquePaymentMethods);
   const result = kmeans(normalizedVectors, bestK, {});
 
   return {
@@ -128,5 +192,7 @@ export function runKmeans(
     elbowAnalysis,
     silhouetteAnalysis,
     bestK,
+    elbowK,
+    paymentMethodsK,
   };
 }
