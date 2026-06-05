@@ -1,27 +1,6 @@
 import type { VtexOrder } from "@/backend/types/vtex";
 import type { FeatureVector, ProcessedOrder } from "@/backend/types/order";
-
-const ORIGIN_MAP: Record<string, number> = {
-  Marketplace: 0,
-};
-
-const PAYMENT_MAP: Record<string, number> = {
-  Promissory: 0,
-  "Boleto Bancário": 1,
-  Dinheiro: 2,
-  Pix: 3,
-  "Cartão de Crédito": 4,
-  "Cartão de Débito": 5,
-  Visa: 6,
-  Mastercard: 7,
-  "American Express": 8,
-  "Diners Club": 9,
-  Hipercard: 10,
-  Aura: 11,
-  Elo: 12,
-  JCB: 13,
-  Discover: 14,
-};
+import type { CustomerProfile } from "@/backend/types/customer";
 
 const STATUS_MAP: Record<string, number> = {
   canceled: 0,
@@ -46,6 +25,13 @@ function buildSalesChannelMap(list: VtexOrder[]): Record<string, number> {
   return Object.fromEntries(channels.map((channel, index) => [channel, index]));
 }
 
+function extractClientEmail(order: VtexOrder): string {
+  const raw = order as VtexOrder & {
+    clientProfileData?: { email?: string };
+  };
+  return raw.clientProfileData?.email?.trim() || order.clientEmail?.trim() || "";
+}
+
 export function processOrders(list: VtexOrder[]): ProcessedOrder[] {
   const salesChannelMap = buildSalesChannelMap(list);
 
@@ -55,6 +41,7 @@ export function processOrders(list: VtexOrder[]): ProcessedOrder[] {
     return {
       orderId: order.orderId,
       clientName: order.clientName,
+      clientEmail: extractClientEmail(order),
       creationDate: order.creationDate,
       items: (order.items ?? []).map((item) => ({
         quantity: item.quantity,
@@ -66,8 +53,8 @@ export function processOrders(list: VtexOrder[]): ProcessedOrder[] {
       })),
       totalValue: order.totalValue,
       totalItems: order.totalItems,
-      origin: ORIGIN_MAP[order.origin] ?? -1,
-      paymentNames: PAYMENT_MAP[order.paymentNames] ?? -1,
+      origin: 0,
+      paymentNames: 0,
       status: STATUS_MAP[order.status] ?? -1,
       statusRaw: order.status,
       paymentRaw: order.paymentNames,
@@ -138,6 +125,60 @@ export function normalize(vectors: number[][]): {
   return { normalized, mins, maxs };
 }
 
+function cyclicEncode(value: number, period: number): [number, number] {
+  const angle = (2 * Math.PI * value) / period;
+  return [Math.sin(angle), Math.cos(angle)];
+}
+
+function buildVocabularies(profiles: CustomerProfile[]): {
+  paymentMethods: string[];
+  salesChannels: string[];
+} {
+  const paymentSet = new Set<string>();
+  const channelSet = new Set<string>();
+
+  profiles.forEach((profile) => {
+    paymentSet.add(profile.preferredPaymentMethod || "Desconhecido");
+    channelSet.add(profile.preferredSalesChannel || "Desconhecido");
+  });
+
+  return {
+    paymentMethods: [...paymentSet].sort(),
+    salesChannels: [...channelSet].sort(),
+  };
+}
+
+export function customerToVector(
+  profile: CustomerProfile,
+  paymentMethods: string[],
+  salesChannels: string[],
+): number[] {
+  const paymentOneHot = paymentMethods.map((method) =>
+    profile.preferredPaymentMethod === method ? 1 : 0,
+  );
+  const channelOneHot = salesChannels.map((channel) =>
+    profile.preferredSalesChannel === channel ? 1 : 0,
+  );
+
+  const [sinHour, cosHour] = cyclicEncode(profile.preferredHour, 24);
+
+  return [
+    profile.totalSpent,
+    profile.totalOrders,
+    profile.averageTicket,
+    profile.daysSinceLastPurchase,
+    profile.averageDaysBetweenOrders,
+    profile.purchaseFrequency,
+    profile.uniqueProducts,
+    profile.weekendPurchaseRate,
+    profile.nightPurchaseRate,
+    sinHour,
+    cosHour,
+    ...paymentOneHot,
+    ...channelOneHot,
+  ];
+}
+
 export function buildFeatureVectors(orders: ProcessedOrder[]): {
   rawVectors: FeatureVector[];
   normalizedVectors: number[][];
@@ -148,4 +189,44 @@ export function buildFeatureVectors(orders: ProcessedOrder[]): {
   const { normalized, mins, maxs } = normalize(rawVectors);
 
   return { rawVectors, normalizedVectors: normalized, mins, maxs };
+}
+
+export function buildCustomerFeatureVectors(profiles: CustomerProfile[]): {
+  rawVectors: number[][];
+  normalizedVectors: number[][];
+  mins: number[];
+  maxs: number[];
+  uniquePaymentMethods: number;
+  paymentMethods: string[];
+  salesChannels: string[];
+} {
+  if (profiles.length === 0) {
+    return {
+      rawVectors: [],
+      normalizedVectors: [],
+      mins: [],
+      maxs: [],
+      uniquePaymentMethods: 0,
+      paymentMethods: [],
+      salesChannels: [],
+    };
+  }
+
+  const { paymentMethods, salesChannels } = buildVocabularies(profiles);
+  const uniquePaymentMethods = paymentMethods.length;
+
+  const rawVectors = profiles.map((profile) =>
+    customerToVector(profile, paymentMethods, salesChannels),
+  );
+  const { normalized, mins, maxs } = normalize(rawVectors);
+
+  return {
+    rawVectors,
+    normalizedVectors: normalized,
+    mins,
+    maxs,
+    uniquePaymentMethods,
+    paymentMethods,
+    salesChannels,
+  };
 }
