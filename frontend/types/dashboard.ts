@@ -6,6 +6,9 @@ export interface OverviewStats {
   errosWorkflow: number;
   totalPedidos: number;
   totalClusters: number;
+  totalClientes: number;
+  receitaEmRisco: number;
+  clvTotal: number;
 }
 
 export interface ProductRank {
@@ -37,6 +40,8 @@ export interface ClusterInfo {
   hourDistribution: number[];
   dayDistribution: number[];
   topProducts: ProductRank[];
+  averageFrequency?: number;
+  averageDaysSinceLastPurchase?: number;
 }
 
 export interface CentroidNormalized {
@@ -89,6 +94,7 @@ export interface SOMNeuron {
   peakHour: number;
   peakDay: string;
   topProducts: ProductRank[];
+  revenueShare?: number;
 }
 
 export interface OperationalHour {
@@ -105,6 +111,75 @@ export interface StatusDistribution {
   name: string;
   count: number;
   color: string;
+}
+
+export interface CustomerSegmentUI {
+  id: number;
+  name: string;
+  description: string;
+  customerCount: number;
+  customerShare: number;
+  revenueShare: number;
+  averageTicket: number;
+  averageFrequency: number;
+  averageDaysSinceLastPurchase: number;
+  totalRevenue: number;
+}
+
+export interface ChurnScoreUI {
+  customerId: string;
+  customerName: string;
+  score: number;
+  riskLevel: "baixo" | "medio" | "alto" | "critico";
+  estimatedLostRevenue: number;
+  daysSinceLastPurchase: number;
+  purchaseFrequency: number;
+}
+
+export interface CLVEstimateUI {
+  customerId: string;
+  customerName: string;
+  currentRevenue: number;
+  predictedRevenue6m: number;
+  estimatedLifetimeValue: number;
+  segmentName: string;
+}
+
+export interface RevenueOpportunityUI {
+  type: string;
+  title: string;
+  description: string;
+  estimatedValue: number;
+  customerCount: number;
+}
+
+export interface ProductAffinityRuleUI {
+  antecedent: string;
+  consequent: string;
+  support: number;
+  confidence: number;
+  lift: number;
+}
+
+export interface MigrationFlowUI {
+  fromSegment: string;
+  toSegment: string;
+  customerCount: number;
+  revenueImpact: number;
+}
+
+export interface ExecutiveInsightUI {
+  text: string;
+  financialImpact: number;
+  priority: "alta" | "media" | "baixa";
+  category: string;
+}
+
+export interface CustomerIntelligenceSummary {
+  recoverableRevenue: number;
+  incrementalRevenue: number;
+  revenueAtRisk: number;
+  totalClv: number;
 }
 
 export interface StrategicRisk {
@@ -173,6 +248,8 @@ export interface DashboardData {
   elbowCurve: ElbowPoint[];
   silhouetteCurve: SilhouettePoint[];
   bestSilhouetteScore: number;
+  elbowK: number;
+  paymentMethodsK: number;
   somGrid: SOMNeuron[];
   operationalHours: OperationalHour[];
   operationalDays: OperationalDay[];
@@ -180,6 +257,14 @@ export interface DashboardData {
   products: ProductRank[];
   productAnomalies: AnomalyProduct[];
   diagnostics: StrategicDiagnostics;
+  customerSegments: CustomerSegmentUI[];
+  churnScores: ChurnScoreUI[];
+  clvEstimates: CLVEstimateUI[];
+  revenueOpportunities: RevenueOpportunityUI[];
+  affinityRules: ProductAffinityRuleUI[];
+  migrationFlows: MigrationFlowUI[];
+  executiveInsights: ExecutiveInsightUI[];
+  customerIntelligenceSummary: CustomerIntelligenceSummary;
 }
 
 export interface ChatMessage {
