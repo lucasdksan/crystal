@@ -23,15 +23,15 @@ describe("runAnalysis", () => {
 
     expect(response.data.orders.length).toBe(fixtureVtexOrdersNormalized().length);
     expect(response.data.customerProfiles.length).toBeGreaterThan(0);
-    expect(response.data.kmeans.clusters).toHaveLength(
-      response.data.customerProfiles.length,
-    );
-    expect(response.data.som.predictions).toHaveLength(
+    expect(response.data.agrupamento.clusters).toHaveLength(
       response.data.customerProfiles.length,
     );
     expect(response.data.customerIntelligence.segments.length).toBeGreaterThan(0);
     expect(response.data.diagnostics.strategies.length).toBeGreaterThan(0);
-    expect(response.data.productKmeans).toBeDefined();
+    expect(response.data.agrupamentoProdutos).toBeDefined();
+    expect(response.data.productIntelligence).toBeDefined();
+    expect(response.data.bcgMatrix).toBeDefined();
+    expect(response.data.catalogHealth).toBeDefined();
     expect(response.data.normalizationMeta.mins.length).toBeGreaterThan(0);
   });
 

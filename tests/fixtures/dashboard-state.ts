@@ -66,23 +66,97 @@ const customerIntelligenceFixture = {
       customerCount: 3,
     },
   ],
-  affinityRules: [
-    {
-      antecedent: "Camiseta Premium",
-      consequent: "Boné Casual",
-      support: 0.25,
-      confidence: 0.7,
-      lift: 2.1,
+  productIntelligence: {
+    clusters: [
+      {
+        id: 0,
+        name: "Campeões",
+        products: [
+          {
+            productKey: "p1",
+            name: "Camiseta Premium",
+            revenue: 500,
+            totalOrders: 5,
+            cancellationRate: 0.1,
+          },
+        ],
+        totalRevenue: 500,
+        revenueShare: 55,
+        productCount: 1,
+        averageCancellationRate: 0.1,
+      },
+    ],
+    diagnostics: [
+      {
+        type: "champion" as const,
+        title: "Campeões",
+        message: "1 produto representa 55% da receita da operação.",
+        severity: "info" as const,
+      },
+    ],
+    totalProducts: 3,
+  },
+  bcgMatrix: {
+    products: [
+      {
+        productKey: "p1",
+        productName: "Camiseta Premium",
+        revenueShare: 55,
+        growthRate: 25,
+        quadrant: "star" as const,
+        revenue: 500,
+        totalOrders: 5,
+      },
+    ],
+    medianRevenueShare: 20,
+    medianGrowthRate: 10,
+    quadrantCounts: {
+      star: 1,
+      cash_cow: 0,
+      question: 0,
+      dog: 2,
     },
-  ],
-  migrationFlows: [
-    {
-      fromSegment: "Clientes Recorrentes",
-      toSegment: "Clientes em Risco",
-      customerCount: 2,
-      revenueImpact: 400,
+  },
+  catalogHealth: {
+    noSale30Days: [],
+    noSale60Days: [],
+    noSale90Days: [],
+    singleSaleProducts: [
+      {
+        productKey: "p3",
+        productName: "Boné Casual",
+        revenue: 50,
+        totalOrders: 1,
+      },
+    ],
+    paretoProducts: [
+      {
+        productKey: "p1",
+        productName: "Camiseta Premium",
+        revenue: 500,
+        totalOrders: 5,
+      },
+    ],
+    decliningProducts: [],
+    growingProducts: [
+      {
+        productKey: "p1",
+        productName: "Camiseta Premium",
+        revenue: 500,
+        totalOrders: 5,
+        growthRate: 25,
+      },
+    ],
+    summary: {
+      totalProducts: 3,
+      paretoCount: 1,
+      paretoRevenueShare: 80,
+      singleSaleCount: 1,
+      noSale90Count: 0,
+      decliningCount: 0,
+      growingCount: 1,
     },
-  ],
+  },
   executiveInsights: [
     {
       text: "2 clientes VIP concentram 55% da receita",
@@ -205,22 +279,6 @@ export const fixtureDashboardState: DashboardData = {
   bestSilhouetteScore: 0.45,
   elbowK: 3,
   paymentMethodsK: 3,
-  somGrid: [
-    {
-      row: 0,
-      col: 1,
-      count: 3,
-      value: 120,
-      label: "3 clientes",
-      cancelRate: 10,
-      deliveryRate: 90,
-      paymentMix: { Pix: 100 },
-      peakHour: 14,
-      peakDay: "Seg",
-      topProducts: [],
-      revenueShare: 45,
-    },
-  ],
   operationalHours: [
     { hour: "14h", count: 3 },
     { hour: "10h", count: 1 },

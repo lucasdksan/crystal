@@ -116,8 +116,7 @@ describe("sendChatMessage", () => {
     const callArgs = generateContent.mock.calls[0][0];
     const systemPrompt = callArgs.config.systemInstruction as string;
 
-    expect(systemPrompt).toContain("K-MEANS");
-    expect(systemPrompt).toContain("MAPA SOM");
+    expect(systemPrompt).toContain("AGRUPAMENTO");
     expect(systemPrompt).toContain("CUSTOMER INTELLIGENCE");
     expect(systemPrompt).toContain("Maria Silva");
     expect(systemPrompt).toContain("Camiseta Premium");
@@ -148,16 +147,16 @@ describe("sendChatMessage", () => {
     expect(response.text).toContain("Ana Costa");
   });
 
-  it("uses keyword fallback for affinity questions without Gemini", async () => {
+  it("uses keyword fallback for product intelligence questions without Gemini", async () => {
     const sendChatMessage = await loadChatAction();
 
     const response = await sendChatMessage(
-      [{ id: "1", sender: "user", text: "regras de afinidade de produtos", timestamp: "" }],
+      [{ id: "1", sender: "user", text: "como está a saúde do catálogo de produtos?", timestamp: "" }],
       fixtureDashboardState,
     );
 
-    expect(response.text).toContain("Afinidade");
+    expect(response.text).toContain("Inteligência de Produtos");
     expect(response.text).toContain("Camiseta Premium");
-    expect(response.text).toContain("Boné Casual");
+    expect(response.text).toContain("Saúde do catálogo");
   });
 });
