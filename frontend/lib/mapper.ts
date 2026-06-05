@@ -1,4 +1,5 @@
 import type { AnalysisResult } from "@/backend/types/analysis";
+import type { CustomerProfile } from "@/backend/types/customer";
 import type { ProcessedOrder } from "@/backend/types/order";
 import type {
   DashboardData,
@@ -219,6 +220,162 @@ function generateClusterDescription(
   return `Grupo misto: ${deliveryRate.toFixed(0)}% de entrega, ${cancelRate.toFixed(0)}% de cancelamento. Ticket médio R$ ${avgFormatted}.${shareText} Monitore conversão e ajuste método de pagamento se necessário.`;
 }
 
+function buildCustomerClusters(
+  profiles: CustomerProfile[],
+  orders: ProcessedOrder[],
+  clusterAssignments: number[],
+  receitaTotal: number,
+  segmentNames: Map<number, string>,
+): ClusterInfo[] {
+  const groups = new Map<number, CustomerProfile[]>();
+
+  profiles.forEach((profile, idx) => {
+    const cId = clusterAssignments[idx];
+    if (!groups.has(cId)) groups.set(cId, []);
+    groups.get(cId)!.push(profile);
+  });
+
+  const profileToOrders = new Map<string, ProcessedOrder[]>();
+  orders.forEach((order) => {
+    const key =
+      order.clientEmail?.trim().toLowerCase() ||
+      order.clientName.trim().toLowerCase() ||
+      order.orderId;
+    if (!profileToOrders.has(key)) profileToOrders.set(key, []);
+    profileToOrders.get(key)!.push(order);
+  });
+
+  return [...groups.entries()]
+    .map(([id, groupProfiles]) => {
+      const count = groupProfiles.length;
+      const percentage =
+        profiles.length > 0
+          ? Math.round((count / profiles.length) * 1000) / 10
+          : 0;
+
+      const totalRevenue = groupProfiles.reduce((s, p) => s + p.totalSpent, 0);
+      const averageValue = count > 0 ? totalRevenue / count : 0;
+      const revenueShare =
+        receitaTotal > 0
+          ? Math.round((totalRevenue / receitaTotal) * 1000) / 10
+          : 0;
+
+      const groupOrders = groupProfiles.flatMap(
+        (p) => profileToOrders.get(p.clientId) ?? [],
+      );
+
+      const canceledCount = groupOrders.filter(
+        (o) => o.statusRaw === "canceled",
+      ).length;
+      const cancelRate =
+        groupOrders.length > 0
+          ? Math.round((canceledCount / groupOrders.length) * 1000) / 10
+          : 0;
+
+      const errorCount = groupOrders.filter(
+        (o) => o.workflowInErrorState === 1,
+      ).length;
+      const errorRate =
+        groupOrders.length > 0
+          ? Math.round((errorCount / groupOrders.length) * 1000) / 10
+          : 0;
+
+      const avgItems =
+        groupOrders.length > 0
+          ? Math.round(
+              (groupOrders.reduce((s, o) => s + o.totalItems, 0) /
+                groupOrders.length) *
+                10,
+            ) / 10
+          : 0;
+
+      const quantities = groupOrders.map((o) =>
+        o.items.reduce((s, item) => s + item.quantity, 0),
+      );
+      const avgQuantity =
+        quantities.length > 0
+          ? Math.round(
+              (quantities.reduce((s, v) => s + v, 0) / quantities.length) * 10,
+            ) / 10
+          : 0;
+
+      const allPrices = groupOrders.flatMap((o) =>
+        o.items.map((item) => item.sellingPrice),
+      );
+      const avgPrice =
+        allPrices.length > 0
+          ? allPrices.reduce((s, v) => s + v, 0) / allPrices.length
+          : 0;
+
+      const payment = mostCommon(
+        groupProfiles.map((p) => p.preferredPaymentMethod),
+      );
+      const statusRaw =
+        groupOrders.length > 0
+          ? mostCommon(groupOrders.map((o) => o.statusRaw))
+          : "—";
+      const origin =
+        groupOrders.length > 0
+          ? mostCommon(groupOrders.map((o) => o.originRaw))
+          : "—";
+      const statusDisplay = STATUS_PT[statusRaw] ?? statusRaw;
+
+      const deliveryRate =
+        groupOrders.length > 0
+          ? (groupOrders.filter((o) => o.isAllDelivered === 1).length /
+              groupOrders.length) *
+            100
+          : 0;
+
+      const paymentMix = buildPaymentMix(groupOrders);
+      const hourDistribution = buildHourDistribution(groupOrders);
+      const dayDistribution = buildDayDistribution(groupOrders);
+      const topProducts = buildTopProducts(groupOrders, 5);
+      const peakHour = findPeakHour(hourDistribution);
+      const peakDay = findPeakDay(dayDistribution);
+
+      const averageFrequency =
+        count > 0
+          ? groupProfiles.reduce((s, p) => s + p.purchaseFrequency, 0) / count
+          : 0;
+      const averageDaysSinceLastPurchase =
+        count > 0
+          ? groupProfiles.reduce((s, p) => s + p.daysSinceLastPurchase, 0) /
+            count
+          : 0;
+
+      const segmentName = segmentNames.get(id) ?? `Segmento ${id}`;
+
+      return {
+        id,
+        name: segmentName,
+        count,
+        percentage,
+        averageValue,
+        avgItems,
+        avgQuantity,
+        avgPrice,
+        payment,
+        status: statusDisplay,
+        origin,
+        deliveryRate,
+        description: `${count} clientes no segmento "${segmentName}". Ticket médio R$ ${averageValue.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. Frequência média ${averageFrequency.toFixed(1)} pedidos/mês. ${revenueShare >= 15 ? `Representa ${revenueShare.toFixed(1)}% da receita.` : ""}`,
+        subtitle: `${count} cliente(s) · ${averageFrequency.toFixed(1)} ped/mês`,
+        cancelRate,
+        totalRevenue,
+        revenueShare,
+        errorRate,
+        paymentMix,
+        hourDistribution,
+        dayDistribution,
+        topProducts,
+        averageFrequency: Math.round(averageFrequency * 100) / 100,
+        averageDaysSinceLastPurchase: Math.round(averageDaysSinceLastPurchase),
+      };
+    })
+    .sort((a, b) => a.id - b.id);
+}
+
 function buildClusters(
   orders: ProcessedOrder[],
   clusterAssignments: number[],
@@ -405,6 +562,77 @@ function buildDenormalizedCentroids(
 }
 
 function buildSomGrid(
+  profiles: CustomerProfile[],
+  predictions: [number, number][],
+  gridX: number,
+  gridY: number,
+  totalRevenue: number,
+): SOMNeuron[] {
+  const grid: SOMNeuron[] = [];
+
+  for (let r = 0; r < gridY; r++) {
+    for (let c = 0; c < gridX; c++) {
+      const matchingProfiles = profiles.filter((_, i) => {
+        const pred = predictions[i];
+        return pred && pred[0] === r && pred[1] === c;
+      });
+
+      const count = matchingProfiles.length;
+      const value =
+        count > 0
+          ? matchingProfiles.reduce((s, p) => s + p.totalSpent, 0) / count
+          : 0;
+
+      const segmentRevenue = matchingProfiles.reduce(
+        (s, p) => s + p.totalSpent,
+        0,
+      );
+      const revenueShare =
+        totalRevenue > 0 ? (segmentRevenue / totalRevenue) * 100 : 0;
+
+      const paymentMix: Record<string, number> = {};
+      matchingProfiles.forEach((p) => {
+        const key = p.preferredPaymentMethod || "Desconhecido";
+        paymentMix[key] = (paymentMix[key] ?? 0) + 1;
+      });
+      if (count > 0) {
+        Object.keys(paymentMix).forEach((key) => {
+          paymentMix[key] = Math.round((paymentMix[key] / count) * 1000) / 10;
+        });
+      }
+
+      const hourCounts = Array(24).fill(0);
+      matchingProfiles.forEach((p) => {
+        hourCounts[p.preferredHour]++;
+      });
+      const peakHour = count > 0 ? hourCounts.indexOf(Math.max(...hourCounts)) : 0;
+
+      const label =
+        count > 0
+          ? `${count} cliente(s) neste quadrante. Ticket médio R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. ${revenueShare.toFixed(1)}% da receita.`
+          : "Quadrante vazio — nenhum cliente mapeado aqui.";
+
+      grid.push({
+        row: r,
+        col: c,
+        count,
+        value,
+        label,
+        cancelRate: 0,
+        deliveryRate: 0,
+        paymentMix,
+        peakHour,
+        peakDay: "—",
+        topProducts: [],
+        revenueShare: Math.round(revenueShare * 10) / 10,
+      });
+    }
+  }
+
+  return grid;
+}
+
+function buildSomGridLegacy(
   orders: ProcessedOrder[],
   predictions: [number, number][],
   gridX: number,
@@ -609,7 +837,16 @@ function buildAnomalyProducts(
 export function mapAnalysisResultToDashboard(
   result: AnalysisResult,
 ): DashboardData {
-  const { orders, kmeans, som, productKmeans, diagnostics, normalizationMeta } = result;
+  const {
+    orders,
+    customerProfiles,
+    kmeans,
+    som,
+    productKmeans,
+    diagnostics,
+    customerIntelligence,
+    normalizationMeta,
+  } = result;
   const { mins, maxs } = normalizationMeta;
 
   const canceledCount = orders.filter((o) => o.statusRaw === "canceled").length;
@@ -623,7 +860,16 @@ export function mapAnalysisResultToDashboard(
   const errosWorkflow = orders.filter((o) => o.workflowInErrorState === 1).length;
   const ticketMedio = totalPedidos > 0 ? receitaTotal / totalPedidos : 0;
 
-  const clusters = buildClusters(orders, kmeans.clusters, receitaTotal);
+  const segmentNames = new Map(
+    customerIntelligence.segments.map((s) => [s.id, s.name]),
+  );
+  const clusters = buildCustomerClusters(
+    customerProfiles,
+    orders,
+    kmeans.clusters,
+    receitaTotal,
+    segmentNames,
+  );
 
   const bestSilhouettePoint = kmeans.silhouetteAnalysis.find(
     (p) => p.k === kmeans.bestK,
@@ -696,6 +942,9 @@ export function mapAnalysisResultToDashboard(
       errosWorkflow,
       totalPedidos,
       totalClusters: kmeans.bestK,
+      totalClientes: customerProfiles.length,
+      receitaEmRisco: customerIntelligence.summary.revenueAtRisk,
+      clvTotal: customerIntelligence.summary.totalClv,
     },
     clusters,
     centroids: buildCentroids(kmeans.centroids),
@@ -708,14 +957,23 @@ export function mapAnalysisResultToDashboard(
     elbowCurve: kmeans.elbowAnalysis,
     silhouetteCurve: kmeans.silhouetteAnalysis,
     bestSilhouetteScore,
-    somGrid: buildSomGrid(orders, som.predictions, som.gridX, som.gridY),
+    elbowK: kmeans.elbowK,
+    paymentMethodsK: kmeans.paymentMethodsK,
+    somGrid: buildSomGrid(
+      customerProfiles,
+      som.predictions,
+      som.gridX,
+      som.gridY,
+      receitaTotal,
+    ),
     operationalHours,
     operationalDays,
     statuses,
     products,
     productAnomalies,
     diagnostics: {
-      summary: diagnostics.diagnosis.executiveSummary,
+      summary: customerIntelligence.executiveInsights[0]?.text ??
+        diagnostics.diagnosis.executiveSummary,
       championProduct: diagnostics.diagnosis.championProduct,
       bottleneckProduct: diagnostics.diagnosis.bottleneckProduct,
       risks,
@@ -723,5 +981,13 @@ export function mapAnalysisResultToDashboard(
       allStrategies,
       clusterRisks,
     },
+    customerSegments: customerIntelligence.segments,
+    churnScores: customerIntelligence.churnScores,
+    clvEstimates: customerIntelligence.clvEstimates,
+    revenueOpportunities: customerIntelligence.revenueOpportunities,
+    affinityRules: customerIntelligence.affinityRules,
+    migrationFlows: customerIntelligence.migrationFlows,
+    executiveInsights: customerIntelligence.executiveInsights,
+    customerIntelligenceSummary: customerIntelligence.summary,
   };
 }
