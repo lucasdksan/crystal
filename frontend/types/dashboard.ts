@@ -82,21 +82,6 @@ export interface SilhouettePoint {
   score: number;
 }
 
-export interface SOMNeuron {
-  row: number;
-  col: number;
-  count: number;
-  value: number;
-  label: string;
-  cancelRate: number;
-  deliveryRate: number;
-  paymentMix: Record<string, number>;
-  peakHour: number;
-  peakDay: string;
-  topProducts: ProductRank[];
-  revenueShare?: number;
-}
-
 export interface OperationalHour {
   hour: string;
   count: number;
@@ -153,21 +138,6 @@ export interface RevenueOpportunityUI {
   customerCount: number;
 }
 
-export interface ProductAffinityRuleUI {
-  antecedent: string;
-  consequent: string;
-  support: number;
-  confidence: number;
-  lift: number;
-}
-
-export interface MigrationFlowUI {
-  fromSegment: string;
-  toSegment: string;
-  customerCount: number;
-  revenueImpact: number;
-}
-
 export interface ExecutiveInsightUI {
   text: string;
   financialImpact: number;
@@ -215,6 +185,93 @@ export interface ClusterRisk {
   revenueShare: number;
 }
 
+export interface ProductClusterProductUI {
+  productKey: string;
+  name: string;
+  revenue: number;
+  totalOrders: number;
+  cancellationRate: number;
+}
+
+export interface ProductClusterUI {
+  id: number;
+  name: string;
+  products: ProductClusterProductUI[];
+  totalRevenue: number;
+  revenueShare: number;
+  productCount: number;
+  averageCancellationRate: number;
+}
+
+export type ProductDiagnosticType =
+  | "champion"
+  | "dependency"
+  | "risk"
+  | "long_tail"
+  | "opportunity";
+
+export type ProductDiagnosticSeverity = "info" | "warning" | "critical";
+
+export interface ProductDiagnosticUI {
+  type: ProductDiagnosticType;
+  title: string;
+  message: string;
+  severity: ProductDiagnosticSeverity;
+}
+
+export interface ProductIntelligenceUI {
+  clusters: ProductClusterUI[];
+  diagnostics: ProductDiagnosticUI[];
+  totalProducts: number;
+}
+
+export type BCGQuadrantUI = "star" | "cash_cow" | "question" | "dog";
+
+export interface BCGProductUI {
+  productKey: string;
+  productName: string;
+  revenueShare: number;
+  growthRate: number;
+  quadrant: BCGQuadrantUI;
+  revenue: number;
+  totalOrders: number;
+}
+
+export interface BCGMatrixUI {
+  products: BCGProductUI[];
+  medianRevenueShare: number;
+  medianGrowthRate: number;
+  quadrantCounts: Record<BCGQuadrantUI, number>;
+}
+
+export interface CatalogHealthProductUI {
+  productKey: string;
+  productName: string;
+  revenue: number;
+  totalOrders: number;
+  daysSinceLastSale?: number;
+  growthRate?: number;
+}
+
+export interface CatalogHealthUI {
+  noSale30Days: CatalogHealthProductUI[];
+  noSale60Days: CatalogHealthProductUI[];
+  noSale90Days: CatalogHealthProductUI[];
+  singleSaleProducts: CatalogHealthProductUI[];
+  paretoProducts: CatalogHealthProductUI[];
+  decliningProducts: CatalogHealthProductUI[];
+  growingProducts: CatalogHealthProductUI[];
+  summary: {
+    totalProducts: number;
+    paretoCount: number;
+    paretoRevenueShare: number;
+    singleSaleCount: number;
+    noSale90Count: number;
+    decliningCount: number;
+    growingCount: number;
+  };
+}
+
 export interface AnomalyProduct {
   productKey: string;
   name: string;
@@ -250,7 +307,6 @@ export interface DashboardData {
   bestSilhouetteScore: number;
   elbowK: number;
   paymentMethodsK: number;
-  somGrid: SOMNeuron[];
   operationalHours: OperationalHour[];
   operationalDays: OperationalDay[];
   statuses: StatusDistribution[];
@@ -261,8 +317,9 @@ export interface DashboardData {
   churnScores: ChurnScoreUI[];
   clvEstimates: CLVEstimateUI[];
   revenueOpportunities: RevenueOpportunityUI[];
-  affinityRules: ProductAffinityRuleUI[];
-  migrationFlows: MigrationFlowUI[];
+  productIntelligence: ProductIntelligenceUI;
+  bcgMatrix: BCGMatrixUI;
+  catalogHealth: CatalogHealthUI;
   executiveInsights: ExecutiveInsightUI[];
   customerIntelligenceSummary: CustomerIntelligenceSummary;
 }
