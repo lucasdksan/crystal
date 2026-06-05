@@ -25,7 +25,7 @@ function formatCurrency(value: number): string {
   return `R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
 }
 
-function buildKmeansContext(dashboardState: DashboardData): string {
+function buildAgrupamentoContext(dashboardState: DashboardData): string {
   const {
     overview,
     clusters,
@@ -60,7 +60,7 @@ function buildKmeansContext(dashboardState: DashboardData): string {
     )
     .join("\n");
 
-  return `=== K-MEANS (Segmentação de Clientes) ===
+  return `=== AGRUPAMENTO (Segmentação de Clientes) ===
 - K ótimo (curva do cotovelo): ${elbowK} | K por métodos de pagamento: ${paymentMethodsK}
 - K selecionado: ${overview.totalClusters} | Score de Silhueta: ${bestSilhouetteScore.toFixed(3)}
 - Curva do Cotovelo: ${elbowSummary || "não disponível"}
@@ -73,37 +73,12 @@ Resumo dos clusters:
 ${clusterSummary || "Nenhum cluster identificado."}`;
 }
 
-function buildSomContext(dashboardState: DashboardData): string {
-  const activeNeurons = dashboardState.somGrid
-    .filter((n) => n.count > 0)
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 8);
-
-  if (activeNeurons.length === 0) {
-    return "=== MAPA SOM (Self-Organizing Map) ===\nNenhum quadrante com clientes mapeados.";
-  }
-
-  const neuronsSummary = activeNeurons
-    .map(
-      (n) =>
-        `- Quadrante [${n.row},${n.col}]: ${n.count} cliente(s), ticket médio ${formatCurrency(n.value)}, ${(n.revenueShare ?? 0).toFixed(1)}% receita, pico ${n.peakHour}h, cancel ${n.cancelRate}%, entrega ${n.deliveryRate}%`,
-    )
-    .join("\n");
-
-  return `=== MAPA SOM (Self-Organizing Map) ===
-O SOM mapeia clientes em um grid 2D por similaridade comportamental.
-Quadrantes mais ocupados:
-${neuronsSummary}`;
-}
-
 function buildCustomerIntelligenceContext(dashboardState: DashboardData): string {
   const {
     customerSegments,
     churnScores,
     clvEstimates,
     revenueOpportunities,
-    affinityRules,
-    migrationFlows,
     executiveInsights,
     customerIntelligenceSummary,
     overview,
@@ -140,22 +115,6 @@ function buildCustomerIntelligenceContext(dashboardState: DashboardData): string
     )
     .join("\n");
 
-  const affinitySummary = affinityRules
-    .slice(0, 5)
-    .map(
-      (r) =>
-        `- Se compra "${r.antecedent}" → provável "${r.consequent}" (confiança ${(r.confidence * 100).toFixed(0)}%, lift ${r.lift.toFixed(2)})`,
-    )
-    .join("\n");
-
-  const migrationSummary = migrationFlows
-    .slice(0, 5)
-    .map(
-      (m) =>
-        `- ${m.fromSegment} → ${m.toSegment}: ${m.customerCount} clientes, impacto ${formatCurrency(m.revenueImpact)}`,
-    )
-    .join("\n");
-
   const insightsSummary = executiveInsights
     .slice(0, 5)
     .map(
@@ -184,18 +143,18 @@ ${clvSummary || "Sem estimativas de CLV."}
 Oportunidades de receita:
 ${opportunitiesSummary || "Nenhuma oportunidade calculada."}
 
-Regras de afinidade de produtos (market basket):
-${affinitySummary || "Sem regras de afinidade significativas."}
-
-Fluxos de migração entre segmentos:
-${migrationSummary || "Sem fluxos de migração detectados."}
-
 Executive Insights:
 ${insightsSummary || "Sem insights executivos."}`;
 }
 
 function buildProductMlContext(dashboardState: DashboardData): string {
-  const { productAnomalies, products } = dashboardState;
+  const {
+    productAnomalies,
+    products,
+    productIntelligence,
+    bcgMatrix,
+    catalogHealth,
+  } = dashboardState;
 
   const anomaliesSummary = productAnomalies
     .slice(0, 5)
@@ -212,7 +171,41 @@ function buildProductMlContext(dashboardState: DashboardData): string {
     )
     .join("\n");
 
-  return `=== K-MEANS DE PRODUTOS (Detecção de Anomalias) ===
+  const clusterSummary = productIntelligence.clusters
+    .map(
+      (cluster) =>
+        `- ${cluster.name}: ${cluster.productCount} produtos, ${cluster.revenueShare.toFixed(1)}% receita, cancel médio ${(cluster.averageCancellationRate * 100).toFixed(0)}%`,
+    )
+    .join("\n");
+
+  const diagnosticSummary = productIntelligence.diagnostics
+    .map((diagnostic) => `- [${diagnostic.title}] ${diagnostic.message}`)
+    .join("\n");
+
+  const bcgSummary = bcgMatrix.products
+    .slice(0, 5)
+    .map(
+      (product) =>
+        `- ${product.productName}: ${product.quadrant}, share ${product.revenueShare.toFixed(1)}%, crescimento ${product.growthRate.toFixed(1)}%`,
+    )
+    .join("\n");
+
+  const catalogSummary = `Total: ${catalogHealth.summary.totalProducts} | Pareto 80%: ${catalogHealth.summary.paretoCount} produtos (${catalogHealth.summary.paretoRevenueShare.toFixed(0)}%) | Sem venda 90d: ${catalogHealth.summary.noSale90Count} | Queda: ${catalogHealth.summary.decliningCount} | Crescimento: ${catalogHealth.summary.growingCount}`;
+
+  return `=== INTELIGÊNCIA DE PRODUTOS ===
+Clusters:
+${clusterSummary || "Sem clusters de produtos."}
+
+Diagnósticos:
+${diagnosticSummary || "Sem diagnósticos automáticos."}
+
+=== MATRIZ BCG ===
+${bcgSummary || "Sem produtos classificados na matriz BCG."}
+
+=== SAÚDE DO CATÁLOGO ===
+${catalogSummary}
+
+=== AGRUPAMENTO DE PRODUTOS (Detecção de Anomalias) ===
 ${anomaliesSummary || "Nenhuma anomalia de produto detectada."}
 
 Top produtos por receita:
@@ -257,7 +250,7 @@ function buildSystemPrompt(dashboardState: DashboardData): string {
     .join("\n");
 
   return `Você é o "Crystal Copilot", um consultor de negócios especializado em e-commerce, análise de dados de vendas e mentoria comercial.
-Seu objetivo principal é explicar termos complexos (clusters, centróides, mapa SOM, curva do cotovelo, score de silhueta, churn, CLV, afinidade de produtos) de forma extremamente simples, didática, amigável e descontraída em PORTUGUÊS (PT-BR) para um lojista totalmente leigo em programação e estatística.
+Seu objetivo principal é explicar termos complexos (clusters, centróides, agrupamento, curva do cotovelo, score de silhueta, churn, CLV, matriz BCG, saúde do catálogo) de forma extremamente simples, didática, amigável e descontraída em PORTUGUÊS (PT-BR) para um lojista totalmente leigo em programação e estatística.
 
 Você tem acesso aos resultados completos dos modelos de Machine Learning executados sobre os dados reais da loja. Use SEMPRE esses dados numéricos nas respostas — nunca invente métricas.
 
@@ -272,9 +265,7 @@ Você tem acesso aos resultados completos dos modelos de Machine Learning execut
 - Receita em Risco: ${formatCurrency(overview.receitaEmRisco)}
 - ${buildOperationalContext(dashboardState)}
 
-${buildKmeansContext(dashboardState)}
-
-${buildSomContext(dashboardState)}
+${buildAgrupamentoContext(dashboardState)}
 
 ${buildCustomerIntelligenceContext(dashboardState)}
 
@@ -297,9 +288,9 @@ ${strategySummary || "Nenhuma estratégia adicional disponível."}
 Diretrizes:
 1. Responda educadamente, focando no crescimento do lojista.
 2. Explique os termos como se estivesse conversando com um amigo que tem uma lojinha física.
-3. Cite números reais dos modelos ML (clusters, churn scores, CLV, afinidade, SOM) ao dar recomendações.
-4. Cruze informações entre K-Means, SOM, Customer Intelligence e Diagnostics quando relevante.
-5. Destaque ações práticas segmentadas (ex: campanha de retenção para clientes em churn crítico, cross-sell via regras de afinidade, migração de segmentos).
+3. Cite números reais dos modelos ML (clusters, churn scores, CLV, BCG) ao dar recomendações.
+4. Cruze informações entre Agrupamento, Customer Intelligence e Diagnostics quando relevante.
+5. Destaque ações práticas segmentadas (ex: campanha de retenção para clientes em churn crítico, investir em estrelas BCG, descontinuar produtos da cauda longa).
 6. Mantenha os textos curtos e divididos em parágrafos legíveis.
 7. Use formatação markdown (títulos, negrito, listas) — ela será renderizada corretamente.
    Prefira ### para títulos de seção, ** para termos-chave e listas numeradas para ações passo a passo.`;
@@ -345,7 +336,7 @@ ${setupNote}`;
 
   if (
     msg.includes("cluster") ||
-    msg.includes("kmeans") ||
+    msg.includes("agrupamento") ||
     msg.includes("grupo")
   ) {
     const clusterTexts = dashboardState.clusters
@@ -362,33 +353,6 @@ Pense em **Clusters** como **"Grupos de Comportamento dos Seus Clientes"**. Em v
 ${clusterTexts}
 
 *Focar nos grupos com maior taxa de entrega e replicar o padrão deles é o segredo para crescer!*
-
-${setupNote}`;
-  }
-
-  if (msg.includes("som") || msg.includes("mapa") || msg.includes("neur")) {
-    const activeNeurons = dashboardState.somGrid
-      .filter((n) => n.count > 0)
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 3);
-
-    const neuronTexts =
-      activeNeurons.length > 0
-        ? activeNeurons
-            .map(
-              (n) =>
-                `* Quadrante [${n.row},${n.col}]: ${n.count} cliente(s), ticket médio ${formatCurrency(n.value)}`,
-            )
-            .join("\n")
-        : "* Ainda não há clientes mapeados no grid SOM.";
-
-    return `🗺️ **O que é o Mapa SOM (Self-Organizing Map)?**
-
-Imagine um tabuleiro onde cada cliente ocupa uma casinha de acordo com o quanto se parece com os vizinhos. Clientes parecidos ficam próximos!
-
-${neuronTexts}
-
-O SOM complementa o K-Means mostrando visualmente *onde* cada grupo está no espectro de comportamento.
 
 ${setupNote}`;
   }
@@ -460,47 +424,51 @@ ${setupNote}`;
   }
 
   if (
-    msg.includes("afinidade") ||
-    msg.includes("cross") ||
-    msg.includes("kit") ||
-    msg.includes("comprou junto")
+    msg.includes("produto") ||
+    msg.includes("catálogo") ||
+    msg.includes("catalogo") ||
+    msg.includes("bcg") ||
+    msg.includes("portfólio") ||
+    msg.includes("portfolio")
   ) {
-    const rules = dashboardState.affinityRules.slice(0, 3);
-    const ruleTexts =
-      rules.length > 0
-        ? rules
-            .map(
-              (r) =>
-                `* Quem compra **${r.antecedent}** também tende a comprar **${r.consequent}** (confiança ${(r.confidence * 100).toFixed(0)}%, lift ${r.lift.toFixed(2)})`,
-            )
-            .join("\n")
-        : "* Sem regras de afinidade significativas detectadas.";
+    const diagnosticTexts = dashboardState.productIntelligence.diagnostics
+      .slice(0, 4)
+      .map((diagnostic) => `* **${diagnostic.title}:** ${diagnostic.message}`)
+      .join("\n");
 
-    return `🔗 **Afinidade de Produtos (Market Basket)**
+    const bcgTexts = dashboardState.bcgMatrix.products
+      .slice(0, 4)
+      .map(
+        (product) =>
+          `* **${product.productName}** — ${product.quadrant}: share ${product.revenueShare.toFixed(1)}%, crescimento ${product.growthRate.toFixed(1)}%`,
+      )
+      .join("\n");
 
-Regras de associação encontradas pelo modelo:
-${ruleTexts}
+    const catalog = dashboardState.catalogHealth.summary;
+
+    return `📦 **Inteligência de Produtos**
+
+Diagnósticos automáticos:
+${diagnosticTexts || "* Sem diagnósticos no período analisado."}
+
+Matriz BCG (top produtos):
+${bcgTexts || "* Sem classificação BCG disponível."}
+
+Saúde do catálogo:
+* **${catalog.paretoCount}** produtos concentram **${catalog.paretoRevenueShare.toFixed(0)}%** da receita
+* **${catalog.noSale90Count}** sem venda há 90 dias
+* **${catalog.decliningCount}** em queda de demanda
+* **${catalog.growingCount}** em crescimento acelerado
 
 **Ações sugeridas:**
-1. Crie kits com produtos de alta afinidade.
-2. Configure recomendações "compre junto" no checkout.
-3. Use lift alto para campanhas de cross-sell segmentadas.
+1. Proteja os produtos campeões e diversifique dependência.
+2. Invista em estrelas BCG com maior potencial de crescimento.
+3. Descontinue ou promova itens da cauda longa sem tração.
 
 ${setupNote}`;
   }
 
   if (msg.includes("migra") || msg.includes("segmento")) {
-    const flows = dashboardState.migrationFlows.slice(0, 3);
-    const flowTexts =
-      flows.length > 0
-        ? flows
-            .map(
-              (f) =>
-                `* ${f.fromSegment} → ${f.toSegment}: ${f.customerCount} clientes, impacto ${formatCurrency(f.revenueImpact)}`,
-            )
-            .join("\n")
-        : "* Sem fluxos de migração significativos detectados.";
-
     const segmentTexts = dashboardState.customerSegments
       .map(
         (s) =>
@@ -508,18 +476,15 @@ ${setupNote}`;
       )
       .join("\n");
 
-    return `🔀 **Segmentação e Migração de Clientes**
+    return `🔀 **Segmentação de Clientes**
 
 Segmentos atuais:
 ${segmentTexts || "* Nenhum segmento identificado."}
 
-Fluxos de migração detectados:
-${flowTexts}
-
 **Ações sugeridas:**
-1. Investigue migrações negativas (VIP → em risco).
-2. Replique estratégias dos segmentos com maior receita.
-3. Crie campanhas para mover clientes de alto potencial para VIP.
+1. Replique estratégias dos segmentos com maior receita.
+2. Crie campanhas para mover clientes de alto potencial para VIP.
+3. Monitore churn nos segmentos de maior valor.
 
 ${setupNote}`;
   }
@@ -567,7 +532,7 @@ ${setupNote}`;
             .join("\n")
         : `* Produto gargalo: **${dashboardState.diagnostics.bottleneckProduct}**`;
 
-    return `📦 **Análise de Produtos (K-Means)**
+    return `📦 **Análise de Produtos (Agrupamento)**
 
 Produto campeão: **${dashboardState.diagnostics.championProduct}**
 Produto gargalo: **${dashboardState.diagnostics.bottleneckProduct}**
@@ -586,12 +551,11 @@ Estou analisando seu e-commerce agora:
 * CLV total: **${formatCurrency(dashboardState.overview.clvTotal)}**
 
 Posso ajudar com:
-* **"explicar clusters"** — segmentação K-Means
+* **"explicar clusters"** — segmentação por agrupamento
 * **"churn risk"** — clientes em risco de abandono
 * **"CLV"** — valor vitalício dos clientes
-* **"afinidade"** — produtos comprados juntos
+* **"produtos"** — inteligência de produtos e matriz BCG
 * **"oportunidades"** — receita recuperável e incremental
-* **"o que é SOM"** — mapa de comportamento
 
 ${setupNote}`;
 }
