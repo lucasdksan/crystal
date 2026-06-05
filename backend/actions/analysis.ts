@@ -4,13 +4,15 @@ import { unstable_noStore as noStore } from "next/cache";
 import type { AnalysisOptions, AnalysisResponse } from "@/backend/types/analysis";
 import { fetchVtexOrders } from "@/backend/services/vtex.service";
 import {
-  buildFeatureVectors,
+  buildCustomerFeatureVectors,
   processOrders,
 } from "@/backend/services/normalization.service";
-import { runKmeans } from "@/backend/services/kmeans.service";
+import { runCustomerKmeans } from "@/backend/services/kmeans.service";
 import { runSom } from "@/backend/services/som.service";
 import { runProductKmeans } from "@/backend/services/product-kmeans.service";
 import { buildDiagnostics } from "@/backend/services/diagnostics.service";
+import { aggregateByCustomer } from "@/backend/services/customer-aggregation.service";
+import { runCustomerIntelligence } from "@/backend/services/customer-intelligence.service";
 
 export async function runAnalysis(
   options?: AnalysisOptions,
@@ -20,20 +22,28 @@ export async function runAnalysis(
   try {
     const rawList = await fetchVtexOrders(options);
     const orders = processOrders(rawList);
-    const { normalizedVectors, mins, maxs } = buildFeatureVectors(orders);
-    const kmeans = runKmeans(normalizedVectors);
+    const customerProfiles = aggregateByCustomer(orders);
+    const { normalizedVectors, mins, maxs, uniquePaymentMethods } =
+      buildCustomerFeatureVectors(customerProfiles);
+    const kmeans = runCustomerKmeans(normalizedVectors, uniquePaymentMethods);
     const som = runSom(normalizedVectors);
     const diagnostics = buildDiagnostics(rawList);
     const productKmeans = runProductKmeans(diagnostics.productStats);
+    const customerIntelligence = runCustomerIntelligence(
+      customerProfiles,
+      kmeans,
+    );
 
     return {
       success: true,
       data: {
         orders,
+        customerProfiles,
         kmeans,
         som,
         productKmeans,
         diagnostics,
+        customerIntelligence,
         normalizationMeta: { mins, maxs },
       },
     };
