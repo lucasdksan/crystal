@@ -5,8 +5,10 @@ import type { AnalysisOptions, AnalysisResponse } from "@/backend/types/analysis
 import { fetchVtexOrders } from "@/backend/services/vtex.service";
 import {
   buildCustomerFeatureVectors,
+  buildRFMVectors,
   processOrders,
 } from "@/backend/services/normalization.service";
+import { runCohortAnalysis } from "@/backend/services/cohort-analysis.service";
 import { runAgrupamentoClientes } from "@/backend/services/agrupamento.service";
 import { runAgrupamentoProdutos } from "@/backend/services/product-agrupamento.service";
 import { buildDiagnostics } from "@/backend/services/diagnostics.service";
@@ -25,11 +27,13 @@ export async function runAnalysis(
     const rawList = await fetchVtexOrders(options);
     const orders = processOrders(rawList);
     const customerProfiles = aggregateByCustomer(orders);
-    const { normalizedVectors, mins, maxs, uniquePaymentMethods } =
+    const { mins, maxs, uniquePaymentMethods } =
       buildCustomerFeatureVectors(customerProfiles);
+    const { vectors: rfmVectors } = buildRFMVectors(customerProfiles);
     const agrupamento = runAgrupamentoClientes(
-      normalizedVectors,
+      rfmVectors,
       uniquePaymentMethods,
+      customerProfiles,
     );
     const diagnostics = buildDiagnostics(rawList);
     const agrupamentoProdutos = runAgrupamentoProdutos(diagnostics.productStats);
@@ -47,6 +51,12 @@ export async function runAnalysis(
       diagnostics.productStats,
       bcgMatrix,
     );
+    const cohortAnalysis = runCohortAnalysis(
+      orders,
+      customerProfiles,
+      agrupamento,
+      customerIntelligence.churnScores,
+    );
 
     return {
       success: true,
@@ -60,6 +70,7 @@ export async function runAnalysis(
         productIntelligence,
         bcgMatrix,
         catalogHealth,
+        cohortAnalysis,
         normalizationMeta: { mins, maxs },
       },
     };
