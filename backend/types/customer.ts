@@ -4,14 +4,25 @@ export interface OrderTimelineEntry {
   orderId: string;
 }
 
+export interface RFMProfile {
+  recencia: number;
+  frequencia: number;
+  valorMonetario: number;
+}
+
 export interface CustomerProfile {
   clientId: string;
   clientName: string;
   clientEmail: string;
+  firstPurchaseDate: string;
   totalSpent: number;
   totalOrders: number;
   averageTicket: number;
   daysSinceLastPurchase: number;
+  recencia: number;
+  frequencia: number;
+  valorMonetario: number;
+  rfmProfile: RFMProfile;
   averageDaysBetweenOrders: number;
   purchaseFrequency: number;
   uniqueProducts: number;
