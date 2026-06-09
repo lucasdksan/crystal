@@ -27,16 +27,15 @@ function formatChatTime(date = new Date()) {
 }
 
 function buildWelcomeMessage(data: DashboardData): ChatMessage {
-  const hasChurn = data.churnScores.length > 0;
-  const hasClv = data.clvEstimates.length > 0;
+  const cohortAlerts = data.cohortMatrix.filter((c) => c.highChurnAlert).length;
   const mlSummary = [
-    `**${data.overview.totalClientes} clientes** em **${data.overview.totalClusters} grupos** (Agrupamento)`,
-    `CLV total estimado: **R$ ${data.overview.clvTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`,
-    hasChurn
+    `**${data.overview.totalClientes} clientes** em **${data.overview.totalClusters} clusters RFM**`,
+    `CLV total: **R$ ${data.overview.clvTotal.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`,
+    data.churnScores.length > 0
       ? `receita em risco: **R$ ${data.overview.receitaEmRisco.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}**`
       : null,
-    data.productIntelligence.clusters.length > 0
-      ? `**${data.productIntelligence.clusters.length} clusters de produtos** identificados`
+    data.cohortMatrix.length > 0
+      ? `**${data.cohortMatrix.length} coortes**${cohortAlerts > 0 ? ` (${cohortAlerts} em alerta)` : ""}`
       : null,
   ]
     .filter(Boolean)
@@ -45,7 +44,7 @@ function buildWelcomeMessage(data: DashboardData): ChatMessage {
   return {
     id: "default",
     sender: "assistant",
-    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Tenho acesso aos resultados dos modelos de ML desta análise — agrupamento, churn, CLV, inteligência de produtos, BCG e mais.\n\n${mlSummary}\n\nTaxa de cancelamento: **${data.overview.taxaCancelamento.toFixed(1)}%** · **${data.overview.totalPedidos} pedidos** analisados.\n\nO que você gostaria de explorar? Pode perguntar livremente ou usar os atalhos abaixo!`,
+    text: `Olá! Sou o **Crystal Copilot**, seu consultor de e-commerce. Tenho acesso a todas as análises do dashboard reorganizado: **RFM + K-means**, **coortes de churn**, **Curva ABC × BCG**, **funil de conversão** e **Insights e Ações**.\n\n${mlSummary}\n\nTaxa de cancelamento: **${data.overview.taxaCancelamento.toFixed(1)}%** · **${data.overview.totalPedidos} pedidos** analisados.\n\nO que você gostaria de explorar? Pode perguntar livremente ou usar os atalhos abaixo!`,
     timestamp: formatChatTime(),
   };
 }
@@ -66,24 +65,28 @@ export function MentorChat({ data }: MentorChatProps) {
 
   const quickPrompts = [
     {
-      label: "📊 Agrupamento de Clientes",
-      query: "Me explica de forma simples os grupos de clientes e o que eles significam para minha loja",
+      label: "📊 RFM e Segmentação",
+      query: "Me explica o que é RFM e o que significam os clusters Campeões, Em Risco e demais grupos da minha loja",
     },
     {
-      label: "🛡️ Churn Risk",
-      query: "Quais clientes estão em risco de churn e o que devo fazer para retê-los?",
+      label: "🛡️ Churn e Coortes",
+      query: "Quais clientes e coortes estão em risco de churn e o que devo fazer para retê-los?",
     },
     {
       label: "👑 CLV",
       query: "Quem são meus clientes mais valiosos e como proteger o CLV da minha base?",
     },
     {
-      label: "📦 Produtos",
-      query: "Como está a saúde do meu catálogo e quais produtos precisam de atenção?",
+      label: "📦 ABC e BCG",
+      query: "Como está minha Curva ABC cruzada com a Matriz BCG e quais produtos precisam de atenção?",
     },
     {
-      label: "💰 Oportunidades",
-      query: "Quais oportunidades de receita incremental e recuperável o modelo identificou?",
+      label: "🔄 Funil de Vendas",
+      query: "Onde está o maior drop-off no funil de conversão e como melhorar?",
+    },
+    {
+      label: "💡 Insights e Ações",
+      query: "Quais insights executivos e oportunidades de receita o modelo identificou?",
     },
   ];
 
@@ -182,9 +185,9 @@ export function MentorChat({ data }: MentorChatProps) {
               Seu Consultor de bolso em Customer Intelligence
             </h3>
             <p className="text-xs text-slate-500 mt-2 leading-relaxed">
-              O <strong>Crystal Copilot</strong> acessa os resultados dos modelos
-              de ML — agrupamento, churn, CLV, BCG e catálogo — e traduz
-              tudo em recomendações comerciais práticas.
+              O <strong>Crystal Copilot</strong> acessa RFM, coortes, Curva ABC,
+              BCG, funil de conversão, CLV e Insights e Ações — e traduz tudo em
+              recomendações comerciais práticas.
             </p>
           </div>
 
@@ -194,7 +197,7 @@ export function MentorChat({ data }: MentorChatProps) {
                 1
               </span>
               <p>
-                Pergunte sobre agrupamento, churn, CLV ou inteligência de produtos
+                Pergunte sobre RFM, coortes, churn, CLV, Curva ABC, BCG ou funil
                 — com números reais da sua loja.
               </p>
             </div>
@@ -203,8 +206,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 2
               </span>
               <p>
-                Peça planos de retenção para clientes em risco ou estratégias
-                para produtos campeões e da cauda longa.
+                Peça planos de retenção para coortes em alerta ou estratégias
+                para produtos Curva A e estrelas BCG.
               </p>
             </div>
             <div className="flex gap-2.5 items-start text-xs text-slate-600">
@@ -212,8 +215,8 @@ export function MentorChat({ data }: MentorChatProps) {
                 3
               </span>
               <p>
-                Explore oportunidades de receita incremental e saúde do
-                catálogo de produtos.
+                Explore Insights e Ações com oportunidades de receita e
+                recomendações prescritivas priorizadas.
               </p>
             </div>
           </div>
