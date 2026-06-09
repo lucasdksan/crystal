@@ -11,6 +11,25 @@ export interface SilhouettePoint {
   score: number;
 }
 
+export interface RFMCentroid {
+  clusterId: number;
+  label: string;
+  recencia: number;
+  frequencia: number;
+  valorMonetario: number;
+}
+
+export interface CohortRow {
+  cohortMonth: string;
+  cohortSize: number;
+  retention: number[];
+  highChurnAlert: boolean;
+}
+
+export interface CohortAnalysisResult {
+  cohorts: CohortRow[];
+}
+
 export interface AgrupamentoResult {
   clusters: number[];
   centroids: number[][];
@@ -20,6 +39,7 @@ export interface AgrupamentoResult {
   bestK: number;
   elbowK: number;
   paymentMethodsK: number;
+  rfmCentroids: RFMCentroid[];
 }
 
 export interface ProductAgrupamentoResult {
@@ -216,6 +236,7 @@ export interface AnalysisResult {
   productIntelligence: ProductIntelligenceResult;
   bcgMatrix: BCGMatrixResult;
   catalogHealth: CatalogHealthResult;
+  cohortAnalysis: CohortAnalysisResult;
   normalizationMeta: NormalizationMeta;
 }
 
