@@ -49,7 +49,7 @@ describe("sendChatMessage", () => {
       fixtureDashboardState,
     );
 
-    expect(response.text).toContain("Grupos (Clusters)");
+    expect(response.text).toContain("K-means + RFM");
     expect(response.text).toContain("Grupo 0");
   });
 
@@ -116,8 +116,10 @@ describe("sendChatMessage", () => {
     const callArgs = generateContent.mock.calls[0][0];
     const systemPrompt = callArgs.config.systemInstruction as string;
 
-    expect(systemPrompt).toContain("AGRUPAMENTO");
+    expect(systemPrompt).toContain("K-MEANS COM RFM");
     expect(systemPrompt).toContain("CUSTOMER INTELLIGENCE");
+    expect(systemPrompt).toContain("ANÁLISE DE COORTE");
+    expect(systemPrompt).toContain("FUNIL DE CONVERSÃO");
     expect(systemPrompt).toContain("Maria Silva");
     expect(systemPrompt).toContain("Camiseta Premium");
     expect(systemPrompt).toContain("Score de Silhueta");
@@ -155,7 +157,7 @@ describe("sendChatMessage", () => {
       fixtureDashboardState,
     );
 
-    expect(response.text).toContain("Inteligência de Produtos");
+    expect(response.text).toContain("Produtos (aba unificada)");
     expect(response.text).toContain("Camiseta Premium");
     expect(response.text).toContain("Saúde do catálogo");
   });

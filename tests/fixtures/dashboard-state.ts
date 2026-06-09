@@ -321,4 +321,12 @@ export const fixtureDashboardState: DashboardData = {
     ],
   },
   ...customerIntelligenceFixture,
+  cohortMatrix: [
+    {
+      cohortMonth: "2025-01",
+      cohortSize: 3,
+      retention: [100, 66.7, 33.3],
+      highChurnAlert: false,
+    },
+  ],
 };

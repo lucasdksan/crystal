@@ -32,6 +32,10 @@ describe("runAnalysis", () => {
     expect(response.data.productIntelligence).toBeDefined();
     expect(response.data.bcgMatrix).toBeDefined();
     expect(response.data.catalogHealth).toBeDefined();
+    expect(response.data.cohortAnalysis).toBeDefined();
+    expect(response.data.agrupamento.rfmCentroids.length).toBe(
+      response.data.agrupamento.bestK,
+    );
     expect(response.data.normalizationMeta.mins.length).toBeGreaterThan(0);
   });
 
