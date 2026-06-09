@@ -1,5 +1,11 @@
 import { kmeans } from "ml-kmeans";
-import type { AgrupamentoResult, ElbowPoint, SilhouettePoint } from "@/backend/types/analysis";
+import type {
+  AgrupamentoResult,
+  ElbowPoint,
+  RFMCentroid,
+  SilhouettePoint,
+} from "@/backend/types/analysis";
+import type { CustomerProfile } from "@/backend/types/customer";
 
 const MAX_K = 8;
 const MIN_K = 3;
@@ -154,12 +160,87 @@ export function runAgrupamento(
   normalizedVectors: number[][],
   maxK: number = MAX_K,
 ): AgrupamentoResult {
-  return runAgrupamentoClientes(normalizedVectors, MIN_K, maxK);
+  return runAgrupamentoClientes(normalizedVectors, MIN_K, undefined, maxK);
+}
+
+function labelRFMCluster(
+  recencia: number,
+  frequencia: number,
+  valorMonetario: number,
+  benchmarks: {
+    recenciaP50: number;
+    frequenciaP50: number;
+    valorP50: number;
+  },
+): string {
+  const { recenciaP50, frequenciaP50, valorP50 } = benchmarks;
+  const isRecent = recencia <= recenciaP50;
+  const isFrequent = frequencia >= frequenciaP50;
+  const isValuable = valorMonetario >= valorP50;
+
+  if (isRecent && isFrequent && isValuable) return "Campeões";
+  if (!isRecent && isFrequent && isValuable) return "Em Risco";
+  if (isRecent && !isFrequent && isValuable) return "Alto Potencial";
+  if (isRecent && isFrequent && !isValuable) return "Fiéis";
+  if (!isRecent && !isFrequent) return "Hibernando";
+  return "Em Desenvolvimento";
+}
+
+function percentile(values: number[], p: number): number {
+  if (values.length === 0) return 0;
+  const sorted = [...values].sort((a, b) => a - b);
+  const index = Math.min(
+    sorted.length - 1,
+    Math.max(0, Math.floor(p * sorted.length)),
+  );
+  return sorted[index];
+}
+
+export function computeRFMCentroids(
+  profiles: CustomerProfile[],
+  clusters: number[],
+  bestK: number,
+): RFMCentroid[] {
+  const benchmarks = {
+    recenciaP50: percentile(
+      profiles.map((p) => p.recencia),
+      0.5,
+    ),
+    frequenciaP50: percentile(
+      profiles.map((p) => p.frequencia),
+      0.5,
+    ),
+    valorP50: percentile(
+      profiles.map((p) => p.valorMonetario),
+      0.5,
+    ),
+  };
+
+  return Array.from({ length: bestK }, (_, clusterId) => {
+    const members = profiles.filter((_, idx) => clusters[idx] === clusterId);
+    const count = members.length || 1;
+
+    const recencia =
+      members.reduce((sum, m) => sum + m.recencia, 0) / count;
+    const frequencia =
+      members.reduce((sum, m) => sum + m.frequencia, 0) / count;
+    const valorMonetario =
+      members.reduce((sum, m) => sum + m.valorMonetario, 0) / count;
+
+    return {
+      clusterId,
+      label: labelRFMCluster(recencia, frequencia, valorMonetario, benchmarks),
+      recencia: Math.round(recencia),
+      frequencia: Math.round(frequencia * 10) / 10,
+      valorMonetario: Math.round(valorMonetario * 100) / 100,
+    };
+  });
 }
 
 export function runAgrupamentoClientes(
   normalizedVectors: number[][],
   uniquePaymentMethods: number,
+  profiles?: CustomerProfile[],
   maxK: number = MAX_K,
 ): AgrupamentoResult {
   const safeMaxK = Math.min(maxK, normalizedVectors.length - 1);
@@ -181,6 +262,11 @@ export function runAgrupamentoClientes(
   const bestK = resolveBestK(candidates, uniquePaymentMethods);
   const result = kmeans(normalizedVectors, bestK, {});
 
+  const rfmCentroids =
+    profiles && profiles.length > 0
+      ? computeRFMCentroids(profiles, result.clusters, bestK)
+      : [];
+
   return {
     clusters: result.clusters,
     centroids: result.centroids,
@@ -194,5 +280,6 @@ export function runAgrupamentoClientes(
     bestK,
     elbowK,
     paymentMethodsK,
+    rfmCentroids,
   };
 }
