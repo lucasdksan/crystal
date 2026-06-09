@@ -111,14 +111,24 @@ export function aggregateByCustomer(orders: ProcessedOrder[]): CustomerProfile[]
       ...new Set(sorted.map((o) => o.paymentRaw || "Desconhecido")),
     ];
 
+    const firstPurchaseDate = sorted[0].creationDate;
+    const recencia = daysSinceLastPurchase;
+    const frequencia = totalOrders;
+    const valorMonetario = totalSpent;
+
     return {
       clientId,
       clientName: sorted[0].clientName || clientId,
       clientEmail: sorted[0].clientEmail || "",
+      firstPurchaseDate,
       totalSpent,
       totalOrders,
       averageTicket,
       daysSinceLastPurchase,
+      recencia,
+      frequencia,
+      valorMonetario,
+      rfmProfile: { recencia, frequencia, valorMonetario },
       averageDaysBetweenOrders,
       purchaseFrequency,
       uniqueProducts: productIds.size,
