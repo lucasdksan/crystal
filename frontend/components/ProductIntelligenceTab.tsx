@@ -1,15 +1,33 @@
 "use client";
 
-import React from "react";
-import type { DashboardData } from "@/frontend/types/dashboard";
+import React, { useMemo, useState } from "react";
+import type { BCGQuadrantUI, DashboardData } from "@/frontend/types/dashboard";
+import {
+  computeABCCurve,
+  filterProductsByCurve,
+  type ABCCurve,
+} from "@/frontend/lib/abc-curve";
 import {
   AlertTriangle,
+  BarChart3,
+  Grid3X3,
   Package,
   Sparkles,
   Target,
   TrendingUp,
   Trophy,
 } from "lucide-react";
+import {
+  CartesianGrid,
+  ReferenceLine,
+  Scatter,
+  ScatterChart,
+  Tooltip,
+  XAxis,
+  YAxis,
+  ZAxis,
+} from "recharts";
+import { ChartContainer } from "@/frontend/components/ChartContainer";
 
 interface ProductIntelligenceTabProps {
   data: DashboardData;
@@ -36,8 +54,57 @@ const CLUSTER_COLORS = [
   "bg-emerald-50 border-emerald-200 text-emerald-700",
 ];
 
+const CURVE_STYLES: Record<ABCCurve, string> = {
+  A: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  B: "bg-amber-100 text-amber-800 border-amber-200",
+  C: "bg-slate-100 text-slate-700 border-slate-200",
+};
+
+const QUADRANT_META: Record<
+  BCGQuadrantUI,
+  { label: string; emoji: string; color: string }
+> = {
+  star: { label: "Estrelas", emoji: "⭐", color: "#f59e0b" },
+  cash_cow: { label: "Vacas Leiteiras", emoji: "🐄", color: "#10b981" },
+  question: { label: "Interrogações", emoji: "❓", color: "#3b82f6" },
+  dog: { label: "Abacaxis", emoji: "🥔", color: "#94a3b8" },
+};
+
+type CurveFilter = "all" | ABCCurve;
+
 export function ProductIntelligenceTab({ data }: ProductIntelligenceTabProps) {
-  const { productIntelligence } = data;
+  const { productIntelligence, bcgMatrix } = data;
+  const [curveFilter, setCurveFilter] = useState<CurveFilter>("all");
+
+  const abcProducts = useMemo(
+    () => computeABCCurve(bcgMatrix.products),
+    [bcgMatrix.products],
+  );
+
+  const filteredBcgProducts = useMemo(
+    () => filterProductsByCurve(bcgMatrix.products, abcProducts, curveFilter),
+    [bcgMatrix.products, abcProducts, curveFilter],
+  );
+
+  const chartData = filteredBcgProducts.map((product) => ({
+    ...product,
+    x: product.revenueShare,
+    y: product.growthRate,
+    z: Math.max(product.revenue, 1),
+  }));
+
+  const grouped = {
+    star: chartData.filter((p) => p.quadrant === "star"),
+    cash_cow: chartData.filter((p) => p.quadrant === "cash_cow"),
+    question: chartData.filter((p) => p.quadrant === "question"),
+    dog: chartData.filter((p) => p.quadrant === "dog"),
+  };
+
+  const curveCounts = {
+    A: abcProducts.filter((p) => p.curve === "A").length,
+    B: abcProducts.filter((p) => p.curve === "B").length,
+    C: abcProducts.filter((p) => p.curve === "C").length,
+  };
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -47,8 +114,8 @@ export function ProductIntelligenceTab({ data }: ProductIntelligenceTabProps) {
           Inteligência de Produtos
         </h2>
         <p className="text-sm text-slate-600 mt-1">
-          Agrupamento por comportamento de venda com diagnósticos
-          automáticos do portfólio.
+          Agrupamento por comportamento de venda, Curva ABC e Matriz BCG
+          cruzadas.
         </p>
       </div>
 
@@ -72,6 +139,182 @@ export function ProductIntelligenceTab({ data }: ProductIntelligenceTabProps) {
           </p>
         </div>
       </div>
+
+      {abcProducts.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex items-center gap-2">
+            <BarChart3 className="w-4 h-4 text-indigo-500" />
+            <h3 className="text-sm font-bold text-slate-900">Curva ABC</h3>
+          </div>
+
+          <div className="grid grid-cols-3 gap-3">
+            {(["A", "B", "C"] as ABCCurve[]).map((curve) => (
+              <div
+                key={curve}
+                className={`rounded-xl border p-3 text-center ${CURVE_STYLES[curve]}`}
+              >
+                <span className="text-[10px] font-bold uppercase">Curva {curve}</span>
+                <p className="text-xl font-black mt-1">{curveCounts[curve]}</p>
+              </div>
+            ))}
+          </div>
+
+          <div className="bg-white rounded-2xl border border-slate-100 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="bg-slate-50 text-slate-500">
+                  <tr>
+                    <th className="text-left p-3 font-semibold">Produto</th>
+                    <th className="text-center p-3 font-semibold">Curva</th>
+                    <th className="text-right p-3 font-semibold">Receita</th>
+                    <th className="text-right p-3 font-semibold">Share</th>
+                    <th className="text-left p-3 font-semibold w-40">
+                      Acumulado
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {abcProducts.slice(0, 15).map((product) => (
+                    <tr
+                      key={product.productKey}
+                      className="border-t border-slate-50 hover:bg-slate-50/50"
+                    >
+                      <td className="p-3 font-medium text-slate-800">
+                        {product.productName}
+                      </td>
+                      <td className="p-3 text-center">
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${CURVE_STYLES[product.curve]}`}
+                        >
+                          {product.curve}
+                        </span>
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        R${" "}
+                        {product.revenue.toLocaleString("pt-BR", {
+                          minimumFractionDigits: 0,
+                        })}
+                      </td>
+                      <td className="p-3 text-right font-mono">
+                        {product.revenueShare.toFixed(1)}%
+                      </td>
+                      <td className="p-3">
+                        <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                          <div
+                            className="h-full bg-indigo-500 rounded-full"
+                            style={{
+                              width: `${Math.min(product.cumulativeShare, 100)}%`,
+                            }}
+                          />
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {bcgMatrix.products.length > 0 && (
+        <section className="space-y-4">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+            <div className="flex items-center gap-2">
+              <Grid3X3 className="w-4 h-4 text-violet-600" />
+              <h3 className="text-sm font-bold text-slate-900">
+                Matriz BCG por Curva ABC
+              </h3>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(["all", "A", "B", "C"] as CurveFilter[]).map((filter) => (
+                <button
+                  key={filter}
+                  type="button"
+                  onClick={() => setCurveFilter(filter)}
+                  className={`px-3 py-1.5 rounded-lg text-[10px] font-bold border transition-colors cursor-pointer ${
+                    curveFilter === filter
+                      ? "bg-indigo-600 text-white border-indigo-600"
+                      : "bg-white text-slate-600 border-slate-200 hover:bg-slate-50"
+                  }`}
+                >
+                  {filter === "all" ? "Todos" : `Curva ${filter}`}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {chartData.length > 0 ? (
+            <div className="bg-white rounded-2xl border border-slate-100 p-6">
+              <ChartContainer height={380}>
+                <ScatterChart
+                  margin={{ top: 20, right: 20, bottom: 20, left: 10 }}
+                >
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis
+                    type="number"
+                    dataKey="x"
+                    name="Participação"
+                    unit="%"
+                    fontSize={10}
+                  />
+                  <YAxis
+                    type="number"
+                    dataKey="y"
+                    name="Crescimento"
+                    unit="%"
+                    fontSize={10}
+                  />
+                  <ZAxis type="number" dataKey="z" range={[40, 400]} />
+                  <ReferenceLine
+                    x={bcgMatrix.medianRevenueShare}
+                    stroke="#cbd5e1"
+                    strokeDasharray="4 4"
+                  />
+                  <ReferenceLine
+                    y={bcgMatrix.medianGrowthRate}
+                    stroke="#cbd5e1"
+                    strokeDasharray="4 4"
+                  />
+                  <Tooltip
+                    content={({ active, payload }) => {
+                      if (!active || !payload?.[0]?.payload) return null;
+                      const item = payload[0].payload as (typeof chartData)[0];
+                      const meta = QUADRANT_META[item.quadrant];
+                      return (
+                        <div className="bg-white border border-slate-200 rounded-xl p-3 shadow-lg text-xs">
+                          <p className="font-bold text-slate-900">
+                            {item.productName}
+                          </p>
+                          <p className="text-slate-500 mt-1">
+                            {meta.emoji} {meta.label}
+                          </p>
+                          <p className="mt-1">
+                            Share: {item.revenueShare.toFixed(1)}%
+                          </p>
+                          <p>Crescimento: {item.growthRate.toFixed(1)}%</p>
+                        </div>
+                      );
+                    }}
+                  />
+                  {(Object.keys(grouped) as BCGQuadrantUI[]).map((quadrant) => (
+                    <Scatter
+                      key={quadrant}
+                      name={QUADRANT_META[quadrant].label}
+                      data={grouped[quadrant]}
+                      fill={QUADRANT_META[quadrant].color}
+                    />
+                  ))}
+                </ScatterChart>
+              </ChartContainer>
+            </div>
+          ) : (
+            <div className="bg-white rounded-2xl border border-slate-100 p-6 text-center text-sm text-slate-500">
+              Nenhum produto na curva selecionada para exibir na matriz BCG.
+            </div>
+          )}
+        </section>
+      )}
 
       {productIntelligence.diagnostics.length > 0 && (
         <div className="space-y-3">
