@@ -732,7 +732,22 @@ export function mapAnalysisResultToDashboard(
     agrupamento.clusters,
     receitaTotal,
     segmentNames,
-  );
+  ).map((cluster) => {
+    const rfmCentroid = agrupamento.rfmCentroids.find(
+      (c) => c.clusterId === cluster.id,
+    );
+    if (!rfmCentroid) return cluster;
+
+    return {
+      ...cluster,
+      rfm: {
+        recencia: rfmCentroid.recencia,
+        frequencia: rfmCentroid.frequencia,
+        valorMonetario: rfmCentroid.valorMonetario,
+      },
+      rfmLabel: rfmCentroid.label,
+    };
+  });
 
   const bestSilhouettePoint = agrupamento.silhouetteAnalysis.find(
     (p) => p.k === agrupamento.bestK,
@@ -846,5 +861,6 @@ export function mapAnalysisResultToDashboard(
     catalogHealth: result.catalogHealth,
     executiveInsights: customerIntelligence.executiveInsights,
     customerIntelligenceSummary: customerIntelligence.summary,
+    cohortMatrix: result.cohortAnalysis.cohorts,
   };
 }
