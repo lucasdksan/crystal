@@ -17,6 +17,12 @@ export interface ProductRank {
   revenue: number;
 }
 
+export interface RFMProfileUI {
+  recencia: number;
+  frequencia: number;
+  valorMonetario: number;
+}
+
 export interface ClusterInfo {
   id: number;
   name: string;
@@ -42,6 +48,15 @@ export interface ClusterInfo {
   topProducts: ProductRank[];
   averageFrequency?: number;
   averageDaysSinceLastPurchase?: number;
+  rfm?: RFMProfileUI;
+  rfmLabel?: string;
+}
+
+export interface CohortRowUI {
+  cohortMonth: string;
+  cohortSize: number;
+  retention: number[];
+  highChurnAlert: boolean;
 }
 
 export interface CentroidNormalized {
@@ -322,6 +337,7 @@ export interface DashboardData {
   catalogHealth: CatalogHealthUI;
   executiveInsights: ExecutiveInsightUI[];
   customerIntelligenceSummary: CustomerIntelligenceSummary;
+  cohortMatrix: CohortRowUI[];
 }
 
 export interface ChatMessage {
