@@ -191,6 +191,52 @@ export function buildFeatureVectors(orders: ProcessedOrder[]): {
   return { rawVectors, normalizedVectors: normalized, mins, maxs };
 }
 
+function zScoreNormalize(vectors: number[][]): number[][] {
+  if (vectors.length === 0) return [];
+
+  const cols = vectors[0].length;
+  const means = Array(cols).fill(0);
+  const stds = Array(cols).fill(0);
+
+  vectors.forEach((row) => {
+    row.forEach((value, i) => {
+      means[i] += value;
+    });
+  });
+  means.forEach((_, i) => {
+    means[i] /= vectors.length;
+  });
+
+  vectors.forEach((row) => {
+    row.forEach((value, i) => {
+      stds[i] += Math.pow(value - means[i], 2);
+    });
+  });
+  stds.forEach((_, i) => {
+    stds[i] = Math.sqrt(stds[i] / vectors.length) || 1;
+  });
+
+  return vectors.map((row) =>
+    row.map((value, i) => (value - means[i]) / stds[i]),
+  );
+}
+
+export function buildRFMVectors(profiles: CustomerProfile[]): {
+  vectors: number[][];
+  labels: string[];
+} {
+  const rawVectors = profiles.map((profile) => [
+    profile.recencia,
+    profile.frequencia,
+    profile.valorMonetario,
+  ]);
+
+  return {
+    vectors: zScoreNormalize(rawVectors),
+    labels: profiles.map((profile) => profile.clientId),
+  };
+}
+
 export function buildCustomerFeatureVectors(profiles: CustomerProfile[]): {
   rawVectors: number[][];
   normalizedVectors: number[][];
