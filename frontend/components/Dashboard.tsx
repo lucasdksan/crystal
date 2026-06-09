@@ -232,7 +232,7 @@ export function Dashboard({ initialData }: DashboardProps) {
       );
     } else {
       showTemporarySuccess(
-        "Relatório aberto! Use Ctrl+P (ou Cmd+P) para salvar como PDF.",
+        "Relatório completo aberto! Use Ctrl+P (ou Cmd+P) para salvar como PDF.",
       );
     }
     setTimeout(() => URL.revokeObjectURL(url), 60000);
