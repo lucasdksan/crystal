@@ -456,6 +456,49 @@ export function ClustersTab({ data }: ClustersTabProps) {
                     {currentSelectedCluster.description}
                   </p>
 
+                  {currentSelectedCluster.rfm && (
+                    <div className="space-y-3 bg-violet-50/50 p-4 rounded-2xl border border-violet-100">
+                      <span className="text-xs font-bold text-violet-700 block uppercase tracking-wide">
+                        Perfil RFM
+                        {currentSelectedCluster.rfmLabel && (
+                          <span className="ml-2 normal-case font-semibold text-violet-600">
+                            · {currentSelectedCluster.rfmLabel}
+                          </span>
+                        )}
+                      </span>
+                      <div className="grid grid-cols-3 gap-2 text-xs font-sans">
+                        <div className="bg-white p-2 rounded-lg text-center">
+                          <span className="text-slate-400 block text-[10px]">
+                            Recência
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {currentSelectedCluster.rfm.recencia}d
+                          </span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg text-center">
+                          <span className="text-slate-400 block text-[10px]">
+                            Frequência
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            {currentSelectedCluster.rfm.frequencia} ped.
+                          </span>
+                        </div>
+                        <div className="bg-white p-2 rounded-lg text-center">
+                          <span className="text-slate-400 block text-[10px]">
+                            Valor Monetário
+                          </span>
+                          <span className="font-bold text-slate-800">
+                            R${" "}
+                            {currentSelectedCluster.rfm.valorMonetario.toLocaleString(
+                              "pt-BR",
+                              { minimumFractionDigits: 0 },
+                            )}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   <div className="space-y-3 bg-slate-50 p-4 rounded-2xl border border-slate-100">
                     <span className="text-xs font-bold text-slate-700 block uppercase tracking-wide">
                       Métricas Comerciais
