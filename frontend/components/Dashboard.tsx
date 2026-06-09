@@ -18,11 +18,10 @@ import { ClustersTab } from "@/frontend/components/ClustersTab";
 import { CustomerIntelligenceTab } from "@/frontend/components/CustomerIntelligenceTab";
 import { ChurnRiskTab } from "@/frontend/components/ChurnRiskTab";
 import { CLVTab } from "@/frontend/components/CLVTab";
-import { RevenueOpportunityTab } from "@/frontend/components/RevenueOpportunityTab";
 import { ProductIntelligenceTab } from "@/frontend/components/ProductIntelligenceTab";
 import { BCGMatrixTab } from "@/frontend/components/BCGMatrixTab";
-import { CatalogHealthTab } from "@/frontend/components/CatalogHealthTab";
-import { ExecutiveInsightsTab } from "@/frontend/components/ExecutiveInsightsTab";
+import { InsightsAcoesTab } from "@/frontend/components/InsightsAcoesTab";
+import { SalesFunnel } from "@/frontend/components/SalesFunnel";
 import { MentorChat } from "@/frontend/components/MentorChat";
 import {
   DateRangeFilter,
@@ -55,10 +54,8 @@ import {
   Users,
   ShieldAlert,
   Crown,
-  Target,
   Package,
   Grid3X3,
-  HeartPulse,
 } from "lucide-react";
 
 interface DashboardProps {
@@ -70,11 +67,9 @@ type DashboardTab =
   | "clientes"
   | "churn"
   | "clv"
-  | "oportunidades"
+  | "insights-acoes"
   | "produtos"
   | "bcg"
-  | "catalogo"
-  | "insights"
   | "mentor";
 
 export function Dashboard({ initialData }: DashboardProps) {
@@ -248,11 +243,9 @@ export function Dashboard({ initialData }: DashboardProps) {
     { id: "clientes", label: "Segmentação", icon: <Users className="w-4 h-4" /> },
     { id: "churn", label: "Churn Risk", icon: <ShieldAlert className="w-4 h-4" /> },
     { id: "clv", label: "CLV", icon: <Crown className="w-4 h-4" /> },
-    { id: "oportunidades", label: "Oportunidades", icon: <Target className="w-4 h-4" /> },
+    { id: "insights-acoes", label: "Insights e Ações", icon: <Lightbulb className="w-4 h-4" /> },
     { id: "produtos", label: "Produtos", icon: <Package className="w-4 h-4" /> },
     { id: "bcg", label: "Matriz BCG", icon: <Grid3X3 className="w-4 h-4" /> },
-    { id: "catalogo", label: "Catálogo", icon: <HeartPulse className="w-4 h-4" /> },
-    { id: "insights", label: "Insights", icon: <Lightbulb className="w-4 h-4" /> },
   ];
 
   return (
@@ -463,10 +456,10 @@ export function Dashboard({ initialData }: DashboardProps) {
 
                   <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3 pt-2">
                     <button
-                      onClick={() => setActiveTab("insights")}
+                      onClick={() => setActiveTab("insights-acoes")}
                       className="px-5 py-3 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl text-xs tracking-wide shadow-xs transition-colors cursor-pointer text-center"
                     >
-                      Ver Executive Insights
+                      Ver Insights e Ações
                     </button>
                     <button
                       onClick={() => setActiveTab("mentor")}
@@ -535,6 +528,8 @@ export function Dashboard({ initialData }: DashboardProps) {
                   {dashboardData.overview.taxaCancelamento.toFixed(1)}%
                 </div>
               </div>
+
+              <SalesFunnel data={dashboardData} />
             </div>
           )}
 
@@ -552,20 +547,14 @@ export function Dashboard({ initialData }: DashboardProps) {
           {activeTab === "clv" && (
             <CLVTab key={analysisKey} data={dashboardData} />
           )}
-          {activeTab === "oportunidades" && (
-            <RevenueOpportunityTab key={analysisKey} data={dashboardData} />
+          {activeTab === "insights-acoes" && (
+            <InsightsAcoesTab key={analysisKey} data={dashboardData} />
           )}
           {activeTab === "produtos" && (
             <ProductIntelligenceTab key={analysisKey} data={dashboardData} />
           )}
           {activeTab === "bcg" && (
             <BCGMatrixTab key={analysisKey} data={dashboardData} />
-          )}
-          {activeTab === "catalogo" && (
-            <CatalogHealthTab key={analysisKey} data={dashboardData} />
-          )}
-          {activeTab === "insights" && (
-            <ExecutiveInsightsTab key={analysisKey} data={dashboardData} />
           )}
           {activeTab === "mentor" && (
             <MentorChat key={analysisKey} data={dashboardData} />
