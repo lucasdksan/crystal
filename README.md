@@ -1,32 +1,81 @@
 # Crystal
 
-Projeto para análise de performance em e-commerces usando machine learning. O backend busca pedidos na VTEX OMS, aplica clustering (K-Means + SOM) e gera diagnósticos estratégicos de portfólio.
+Dashboard de inteligência para e-commerce que conecta à VTEX OMS, aplica machine learning e gera diagnósticos estratégicos de portfólio, clientes, estoque e riscos operacionais.
+
+## O que o Crystal faz
+
+- **Clustering de pedidos** com K-Prototypes (dados numéricos + categóricos: pagamento, origem, canal, status)
+- **Segmentação RFM** de clientes com recomendações de ação por segmento
+- **Diagnósticos de portfólio** — dependência de produto campeão, riscos, estratégias priorizadas e impacto financeiro estimado
+- **Análise de estoque** — curva ABC, risco de ruptura e estoque parado
+- **Detecção de fraude** heurística em pedidos suspeitos
+- **Previsão de demanda** por SKU com recomendações de compra
+- **Alertas operacionais** com severidade, impacto financeiro e ação recomendada
+- **Health Score** consolidado (cancelamento, entrega, estoque, concentração de receita, fraude)
+- **Mentor IA** (Gemini) com contexto do dashboard para perguntas em linguagem natural
+- **Exportação de relatório HTML** a partir do dashboard
+
+## Stack
+
+| Camada | Tecnologias |
+|--------|-------------|
+| App | Next.js 16, React 19, Tailwind CSS 4 |
+| Backend | Server Actions (sem API Routes) |
+| ML | K-Prototypes, K-Means (produtos), heurísticas estatísticas |
+| IA | Google Gemini (`@google/genai`) |
+| Gráficos | Recharts |
+| Testes | Vitest |
 
 ## Arquitetura
 
 ```
-Frontend (Client Components)
+app/page.tsx (SSR)
         │
         ▼
-backend/actions/analysis.ts   ← Server Actions (controller)
+backend/actions/analysis.ts          ← Server Action principal
         │
-        ├── backend/services/vtex.service.ts
-        ├── backend/services/normalization.service.ts
-        ├── backend/services/kmeans.service.ts
-        ├── backend/services/som.service.ts
-        └── backend/services/diagnostics.service.ts
+        ├── vtex.service.ts          ← fetch pedidos VTEX OMS
+        ├── normalization.service.ts ← processamento + normalização min-max
+        ├── kprototype.service.ts    ← clustering de pedidos (mixed data)
+        ├── product-kmeans.service.ts ← anomalias por produto
+        ├── diagnostics.service.ts   ← portfólio, riscos e estratégias
+        ├── rfm.service.ts           ← segmentação de clientes
+        ├── inventory.service.ts     ← ABC, ruptura, estoque parado
+        ├── fraud.service.ts         ← flags de fraude
+        ├── forecast.service.ts      ← previsão de demanda
+        ├── alerts.service.ts        ← alertas consolidados
+        ├── financial.service.ts     ← impacto financeiro nas estratégias
+        └── health.service.ts        ← score de saúde da operação
+
+frontend/lib/mapper.ts               ← AnalysisResult → DashboardData
+frontend/components/Dashboard.tsx    ← abas e visualizações
+backend/actions/chat.ts              ← Mentor IA (Gemini)
 ```
 
-- **Actions** (`backend/actions/`): ponto de entrada do frontend. Orquestram os services e retornam dados tipados.
+**Convenções:**
+
+- **Actions** (`backend/actions/`): ponto de entrada do frontend. Orquestram services e retornam dados tipados.
 - **Services** (`backend/services/`): lógica de negócio pura — fetch VTEX, normalização, ML e diagnósticos.
 - **Types** (`backend/types/`): contratos TypeScript do backend.
-- **Ambient types** (`types/`): declarações de tipos para pacotes sem `@types` (ex: `ml-som`).
+- O frontend se comunica **apenas via Server Actions** — não há API Routes.
 
-O frontend deve se comunicar **apenas via Server Actions**. Não há API Routes.
+## Pré-requisitos
+
+- Node.js 22+
+- Conta VTEX com credenciais de app (App Key + App Token) e acesso à OMS
+- *(Opcional)* Chave da API Google Gemini para o Mentor IA
 
 ## Configuração
 
-Copie `.env.example` para `.env.local` e preencha as credenciais:
+1. Clone o repositório e instale as dependências:
+
+```bash
+git clone https://github.com/lucasdksan/crystal.git
+cd crystal
+npm install
+```
+
+2. Copie `.env.example` para `.env.local` e preencha as credenciais:
 
 ```env
 VTEX_BASE_URL=https://your-account.myvtex.com/
@@ -36,41 +85,69 @@ VTEX_APP_TOKEN=your-app-token
 # Opcional — Mentor IA (Gemini)
 GEMINI_API_KEY=your-gemini-api-key
 GEMINI_MODEL=gemini-2.5-flash
-
-# Opcional — iterações do SOM (padrão: 20)
-SOM_ITERATIONS=20
 ```
 
-## Uso no Frontend
+3. Inicie o servidor de desenvolvimento:
+
+```bash
+npm run dev
+```
+
+Abra [http://localhost:3000](http://localhost:3000). A página inicial executa `runAnalysis()` no servidor e renderiza o dashboard com os dados retornados.
+
+## Dashboard
+
+| Aba | Conteúdo |
+|-----|----------|
+| **Resumo Executivo** | KPIs, health score, diagnóstico e visão geral |
+| **Clientes** | Clusters de pedidos (K-Prototypes) e perfis |
+| **Relacionamento** | Segmentação RFM e recomendações |
+| **Estoque** | Curva ABC, risco de ruptura, estoque parado |
+| **Alertas** | Alertas operacionais priorizados por impacto |
+| **Riscos** | Riscos de portfólio e flags de fraude |
+| **Oportunidades** | Estratégias, kits e previsões de compra |
+
+Use o filtro **De / Até** (calendário nativo) e clique em **Aplicar** para reexecutar a análise em um período específico. O formato de data segue o padrão do Admin VTEX (`f_creationDate`).
+
+O **Mentor IA** fica disponível como painel lateral quando `GEMINI_API_KEY` está configurada.
+
+## Uso programático
 
 ```tsx
 import { runAnalysis } from "@/backend/actions/analysis";
 
-// Lote padrão (comportamento SSR atual)
+// Lote padrão (comportamento SSR da página inicial)
 const response = await runAnalysis();
 
-// Com filtro de período (mesmo formato do Admin VTEX: f_creationDate)
+// Com filtro de período
 const filtered = await runAnalysis({
   startDate: "2026-04-01T00:00:00.000Z",
   endDate: "2026-06-30T23:59:59.999Z",
   perPage: 50,
   page: 1,
 });
-```
 
-No dashboard, use os campos **De** / **Até** (calendário nativo) e clique em **Aplicar**. Ex.: 01/04/2026 até 30/06/2026.
-
-```tsx
 if (!response.success) {
   console.error(response.error);
   return;
 }
 
-const { orders, kmeans, som, productKmeans, diagnostics, normalizationMeta } =
-  response.data;
+const {
+  orders,
+  kprototypes,
+  productKmeans,
+  diagnostics,
+  normalizationMeta,
+  rfm,
+  inventory,
+  alerts,
+  fraud,
+  forecast,
+  healthScore,
+} = response.data;
 ```
 
-## Contrato de Dados — `runAnalysis()`
+## Contrato de dados — `runAnalysis()`
 
 A action retorna um discriminated union:
 
@@ -82,162 +159,107 @@ type AnalysisResponse =
 
 ### `AnalysisResult`
 
-| Campo | Tipo | Descrição |
-|-------|------|-----------|
-| `orders` | `ProcessedOrder[]` | Pedidos enriquecidos com campos codificados para ML |
-| `kmeans` | `KmeansResult` | Resultado do clustering K-Means (pedidos) |
-| `som` | `SomResult` | Resultado do Self-Organizing Map |
-| `productKmeans` | `ProductKmeansResult` | Clustering de produtos para anomalias |
-| `diagnostics` | `DiagnosticsResult` | Diagnósticos estratégicos de portfólio |
-| `normalizationMeta` | `{ mins, maxs }` | Limites min-max usados na normalização (9 dims) |
+| Campo | Descrição |
+|-------|-----------|
+| `orders` | Pedidos processados com campos codificados para ML |
+| `kprototypes` | Clustering K-Prototypes de pedidos (mixed data) |
+| `productKmeans` | Clustering de produtos para detecção de anomalias |
+| `diagnostics` | Diagnósticos, riscos, estratégias e scores de portfólio |
+| `normalizationMeta` | Limites min-max usados na normalização |
+| `rfm` | Segmentação RFM de clientes |
+| `inventory` | Curva ABC, ruptura e estoque parado |
+| `alerts` | Alertas operacionais consolidados |
+| `fraud` | Pedidos sinalizados e resumo de exposição |
+| `forecast` | Previsões por SKU e recomendações de compra |
+| `healthScore` | Score de saúde da operação (0–100 por dimensão) |
 
----
+### Vetor de features (pedidos)
 
-### `ProcessedOrder`
+**Numérico (4 dims):** `totalValue`, `totalItems`, `totalQuantity`, `avgPrice`
 
-Cada pedido contém os dados originais mais campos numéricos para clustering:
+**Categórico (5 dims):** `paymentMethod`, `origin`, `salesChannel`, `status`, `dayOfWeek`
 
-```ts
-{
-  orderId: string;
-  clientName: string;
-  creationDate: string;          // ISO 8601
-  items: ProcessedOrderItem[];
-  totalValue: number;
-  totalItems: number;
-  origin: number;                // codificado (Marketplace = 0, desconhecido = -1)
-  paymentNames: number;          // codificado (Pix = 3, Cartão de Crédito = 4, etc.)
-  status: number;                // codificado (canceled = 0, delivered = 4, etc.)
-  statusRaw: string;             // valor original da VTEX
-  paymentRaw: string;
-  originRaw: string;
-  hourOfDay: number;             // 0–23
-  dayOfWeek: number;             // 0–6 (domingo = 0)
-  salesChannel: number;          // codificado dinamicamente
-  salesChannelRaw: string;
-  workflowInErrorState: number;    // 0 ou 1
-  isAllDelivered: number;        // 0 ou 1
-}
-```
+Os valores numéricos passam por normalização min-max antes do clustering. O K-Prototypes escolhe automaticamente o K ótimo entre candidatos `k = 3 … 8` pelo maior score de silhueta.
 
-**Vetor de features (9 dimensões):** `totalValue`, `totalItems`, `totalQuantity`, `avgPrice`, `origin`, `paymentNames`, `hourOfDay`, `dayOfWeek`, `salesChannel`. Os valores são normalizados (min-max) antes do clustering.
+### Relação entre arrays
 
----
-
-### `KmeansResult`
+Arrays indexados (`kprototypes.clusters`, etc.) seguem a **mesma ordem** de `orders[]`:
 
 ```ts
-{
-  clusters: number[];              // cluster id por pedido (mesmo índice de orders[])
-  centroids: number[][];           // coordenadas de cada centróide
-  orderDistances: number[];        // distância euclidiana ao centróide
-  elbowAnalysis: { k: number; wcss: number }[];  // curva do cotovelo
-  silhouetteAnalysis: { k: number; score: number }[];  // silhueta por K
-  bestK: number;                   // K ótimo (silhueta média, mínimo 3)
-}
+orders[i]                  → pedido
+kprototypes.clusters[i]    → cluster do pedido
+kprototypes.orderDistances[i] → distância ao centróide
 ```
 
-O K é escolhido automaticamente entre candidatos `k = 1 … 8` pelo maior **score de silhueta** entre `k >= 3`, não por valor fixo.
-
----
-
-### `SomResult`
-
-```ts
-{
-  predictions: [number, number][]; // posição [x, y] no grid SOM por pedido
-  gridX: number;                   // largura do grid (3–8)
-  gridY: number;                   // altura do grid (3–8)
-}
-```
-
----
-
-### `ProductKmeansResult`
-
-```ts
-{
-  productKeys: string[];   // chaves dos produtos elegíveis (>= 2 pedidos)
-  clusters: number[];      // cluster por produto
-  distances: number[];     // distância ao centróide (base do score de anomalia)
-  bestK: number;
-}
-```
-
----
-
-### `DiagnosticsResult`
+### `DiagnosticsResult` (resumo)
 
 ```ts
 {
   diagnosis: {
-    executiveSummary: string;      // resumo executivo em texto
-    excessiveDependency: boolean;  // true se campeão > 50% do volume
-    championProduct: string;       // produto com maior volume efetivo
-    bottleneckProduct: string;     // produto com pior relação cancelamento/volume
+    executiveSummary: string;
+    excessiveDependency: boolean;  // campeão > 50% do volume
+    championProduct: string;
+    bottleneckProduct: string;
   };
-  risks: {
-    product: string;
-    riskType: string;              // "Ilusão de Receita (Cancelamentos)" | "Estoque Parado"
-    severity: string;                // "Alta" | "Média"
-  }[];
+  risks: { product, riskType, severity }[];
   strategies: {
-    type: string;                    // RISK_MITIGATION | DIVERSIFICATION | KIT_OPPORTUNITY | ...
-    label: string;                   // label legível em português
-    confidenceScore: number;         // 0–1
-    impactScore: number;             // 0–1
-    riskScore: number;               // 0–1
-    priorityScore: number;           // impactScore × confidenceScore
+    type: StrategyType;            // RISK_MITIGATION | DIVERSIFICATION | KIT_OPPORTUNITY | ...
+    label: string;
+    confidenceScore: number;       // 0–1
+    impactScore: number;
+    riskScore: number;
+    priorityScore: number;         // impactScore × confidenceScore
     justifications: string[];
     evidence: Record<string, unknown>;
-    actions: { label: string; description: string }[];
-    kits?: {
-      commercialName: string;
-      compositeItems: string[];
-      strategicObjective: string;
-      salesRationale: string;
-    }[];
+    actions: { label, description }[];
+    kits?: { commercialName, compositeItems, strategicObjective, salesRationale }[];
+    financialImpact?: { problem, estimatedLoss, recommendedAction, estimatedRecovery, estimatedCost, roi, priority };
   }[];
-  productStats: ProductStat[];       // estatísticas brutas por produto
-  productScores: ProductScore[];     // stats + riskScore, bundleScore, volumeShare
-  portfolioScores: {
-    dependencyScore: number;         // 0–1, share do produto campeão
-    portfolioRiskScore: number;      // 0–1
-    cancelRateNorm: number;          // 0–1
-    portfolioHealth: number;         // 0–1
-    avgBundleScore: number;          // 0–1
-  };
+  productStats: ProductStat[];
+  productScores: ProductScore[];   // stats + riskScore, bundleScore, volumeShare
+  portfolioScores: { dependencyScore, portfolioRiskScore, cancelRateNorm, portfolioHealth, avgBundleScore };
 }
 ```
 
----
+Tipos completos em [`backend/types/analysis.ts`](backend/types/analysis.ts).
 
-## Relação entre arrays
+## Estrutura do projeto
 
-Todos os arrays indexados (`clusters`, `predictions`) seguem a **mesma ordem** de `orders[]`:
-
-```ts
-orders[i]        → pedido
-kmeans.clusters[i] → cluster do pedido
-som.predictions[i] → posição [x, y] no mapa SOM
+```
+app/                    # Rotas Next.js (App Router)
+backend/
+  actions/              # Server Actions (analysis, chat)
+  services/             # Lógica de negócio e ML
+  types/                # Tipos do backend
+frontend/
+  components/           # Abas e componentes do dashboard
+  lib/                  # Mapper, datas VTEX, relatório HTML, simulação
+  types/                # Tipos do dashboard
+tests/
+  unit/                 # Testes de services e libs
+  integration/          # Testes de actions e VTEX
+  fixtures/             # Dados de exemplo
 ```
 
-## Visualização
+## Testes
 
-A geração de gráficos e relatórios HTML (antigo `charts.js`) é responsabilidade do **frontend**. Os dados retornados por `runAnalysis()` contêm tudo necessário para renderizar:
+```bash
+npm run test           # roda todos os testes
+npm run test:watch     # modo interativo
+npm run test:coverage  # relatório de cobertura
+```
 
-- Curva do cotovelo → `kmeans.elbowAnalysis`
-- Scatter de clusters → `kmeans.clusters` + `orders`
-- Mapa SOM → `som.predictions` + `som.gridX/gridY`
-- KPIs e diagnósticos → `diagnostics.*`
+A CI (GitHub Actions) executa lint, testes e build em cada push/PR para `main`/`master`.
 
 ## Scripts
 
 ```bash
-npm run dev           # servidor de desenvolvimento
-npm run build         # build de produção
-npm run lint          # lint
-npm run test          # roda todos os testes
-npm run test:watch    # modo interativo
-npm run test:coverage # relatório de cobertura
+npm run dev            # servidor de desenvolvimento
+npm run build          # build de produção
+npm run start          # servidor de produção
+npm run lint           # ESLint
 ```
+
+## Licença
+
+ISC — veja [LICENSE](LICENSE).
