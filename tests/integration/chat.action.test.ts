@@ -37,7 +37,7 @@ describe("sendChatMessage", () => {
       fixtureDashboardState,
     );
 
-    expect(response.text).toContain("Taxa de Cancelamento");
+    expect(response.text).toContain("Problema");
     expect(response.text).toContain("GEMINI_API_KEY");
   });
 
@@ -49,8 +49,8 @@ describe("sendChatMessage", () => {
       fixtureDashboardState,
     );
 
-    expect(response.text).toContain("Grupos (Clusters)");
-    expect(response.text).toContain("Grupo 0");
+    expect(response.text).toContain("Segmentos");
+    expect(response.text).toContain("Conversores PIX");
   });
 
   it("returns the default greeting for unknown prompts without Gemini", async () => {
@@ -62,7 +62,7 @@ describe("sendChatMessage", () => {
     );
 
     expect(response.text).toContain("Crystal Copilot");
-    expect(response.text).toContain("8 pedidos");
+    expect(response.text).toContain("Health Score");
   });
 
   it("calls Gemini when API key is configured", async () => {

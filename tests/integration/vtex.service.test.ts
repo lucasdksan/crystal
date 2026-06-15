@@ -55,10 +55,28 @@ describe("vtex.service", () => {
     const [order] = await fetchVtexOrders();
 
     expect(order.totalValue).toBe(fixtureVtexOrdersRaw[0].totalValue / 100);
-    expect(order.items[0].price).toBe(fixtureVtexOrdersRaw[0].items[0].price / 100);
-    expect(order.items[0].sellingPrice).toBe(
-      fixtureVtexOrdersRaw[0].items[0].sellingPrice / 100,
+    expect(order.items?.[0]?.price).toBe(fixtureVtexOrdersRaw[0].items?.[0]?.price ? fixtureVtexOrdersRaw[0].items?.[0]?.price / 100 : undefined);
+    expect(order.items?.[0]?.sellingPrice).toBe(
+      fixtureVtexOrdersRaw[0].items?.[0]?.sellingPrice ? fixtureVtexOrdersRaw[0].items?.[0]?.sellingPrice / 100 : undefined,
     );
+  });
+
+  it("handles orders with null items from VTEX list endpoint", async () => {
+    const orderWithNullItems = {
+      ...fixtureVtexOrdersRaw[0],
+      items: null,
+    };
+
+    vi.spyOn(global, "fetch").mockResolvedValue(
+      new Response(JSON.stringify({ list: [orderWithNullItems] }), {
+        status: 200,
+        headers: { "Content-Type": "application/json" },
+      }),
+    );
+
+    const [order] = await fetchVtexOrders();
+
+    expect(order.items).toEqual([]);
   });
 
   it("throws when VTEX returns an empty order list", async () => {

@@ -22,11 +22,16 @@ describe("runAnalysis", () => {
     if (!response.success) return;
 
     expect(response.data.orders.length).toBe(fixtureVtexOrdersNormalized().length);
-    expect(response.data.kmeans.clusters).toHaveLength(response.data.orders.length);
-    expect(response.data.som.predictions).toHaveLength(response.data.orders.length);
+    expect(response.data.kprototypes.clusters).toHaveLength(response.data.orders.length);
     expect(response.data.diagnostics.strategies.length).toBeGreaterThan(0);
     expect(response.data.productKmeans).toBeDefined();
-    expect(response.data.normalizationMeta.mins).toHaveLength(9);
+    expect(response.data.normalizationMeta.mins).toHaveLength(4);
+    expect(response.data.rfm).toBeDefined();
+    expect(response.data.inventory).toBeDefined();
+    expect(response.data.alerts).toBeDefined();
+    expect(response.data.fraud).toBeDefined();
+    expect(response.data.forecast).toBeDefined();
+    expect(response.data.healthScore).toBeDefined();
   });
 
   it("forwards analysis options to fetchVtexOrders", async () => {

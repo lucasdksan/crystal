@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   buildFeatureVectors,
+  buildMixedDataPoints,
+  normalizeMixedData,
   normalize,
   orderToVector,
   processOrders,
@@ -53,6 +55,13 @@ describe("normalization.service", () => {
       expect(firstOrder?.hourOfDay).toBe(new Date("2025-01-15T10:00:00.000Z").getHours());
       expect(firstOrder?.dayOfWeek).toBe(new Date("2025-01-15T10:00:00.000Z").getDay());
     });
+
+    it("handles orders with null items from VTEX list endpoint", () => {
+      const raw = fixtureVtexOrdersNormalized();
+      const [processed] = processOrders([{ ...raw[0], items: null }]);
+
+      expect(processed.items).toEqual([]);
+    });
   });
 
   describe("orderToVector", () => {
@@ -90,6 +99,31 @@ describe("normalization.service", () => {
           expect(value).toBeLessThanOrEqual(1);
         });
       });
+    });
+  });
+
+  describe("buildMixedDataPoints", () => {
+    it("extracts numeric and categorical features separately", () => {
+      const processed = processOrders(fixtureVtexOrdersNormalized());
+      const mixed = buildMixedDataPoints(processed);
+
+      expect(mixed).toHaveLength(processed.length);
+      mixed.forEach((point) => {
+        expect(point.numeric).toHaveLength(4);
+        expect(point.categorical.paymentMethod).toBeTruthy();
+        expect(point.categorical.status).toBeTruthy();
+      });
+    });
+
+    it("normalizes only numeric dimensions", () => {
+      const processed = processOrders(fixtureVtexOrdersNormalized());
+      const mixed = buildMixedDataPoints(processed);
+      const { normalized, mins, maxs } = normalizeMixedData(mixed);
+
+      expect(normalized).toHaveLength(processed.length);
+      expect(mins).toHaveLength(4);
+      expect(maxs).toHaveLength(4);
+      expect(normalized[0].categorical.paymentMethod).toBeTruthy();
     });
   });
 });
