@@ -1,11 +1,11 @@
 import type { AnalysisResult } from "@/backend/types/analysis";
 import type { ProcessedOrder } from "@/backend/types/order";
+import { getHealthLabel } from "@/backend/services/health.service";
 import type {
   DashboardData,
   ClusterInfo,
   CentroidNormalized,
   CentroidDenormalized,
-  SOMNeuron,
   StatusDistribution,
   StrategicRisk,
   KitSuggestion,
@@ -46,24 +46,6 @@ const STATUS_COLORS: Record<string, string> = {
 };
 
 const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"];
-
-const PAYMENT_REVERSE: Record<number, string> = {
-  0: "Promissory",
-  1: "Boleto Bancário",
-  2: "Dinheiro",
-  3: "Pix",
-  4: "Cartão de Crédito",
-  5: "Cartão de Débito",
-  6: "Visa",
-  7: "Mastercard",
-  8: "American Express",
-  9: "Diners Club",
-  10: "Hipercard",
-  11: "Aura",
-  12: "Elo",
-  13: "JCB",
-  14: "Discover",
-};
 
 function mostCommon<T>(arr: T[]): T {
   const freq = new Map<T, number>();
@@ -140,25 +122,6 @@ function findPeakDay(dayDistribution: number[]): string {
   return DAY_NAMES[peak];
 }
 
-function generateClusterName(
-  id: number,
-  payment: string,
-  deliveryRate: number,
-): string {
-  if (deliveryRate > 50) return `Cluster ${id} - Grupo Saudável`;
-  const p = payment.toLowerCase();
-  if (p.includes("promiss")) return `Cluster ${id} - Promissória`;
-  if (p.includes("boleto")) return `Cluster ${id} - Boleto`;
-  if (p.includes("dinheiro") || p.includes("pix"))
-    return `Cluster ${id} - Pagamento Imediato`;
-  return `Cluster ${id}`;
-}
-
-function generateClusterSubtitle(count: number, deliveryRate: number): string {
-  if (deliveryRate > 50) return `${count} pedido(s) com alta taxa de conversão`;
-  return `${count} pedido(s) com baixa conversão`;
-}
-
 function generateClusterDescription(
   payment: string,
   avgValue: number,
@@ -166,63 +129,27 @@ function generateClusterDescription(
   cancelRate: number,
   count: number,
   revenueShare: number,
-  errorRate: number,
-  peakDay?: string,
-  peakHour?: number,
 ): string {
-  const p = payment.toLowerCase();
   const avgFormatted = avgValue.toLocaleString("pt-BR", {
     minimumFractionDigits: 2,
   });
-  const shareText =
-    revenueShare >= 15
-      ? ` Este grupo representa ${revenueShare.toFixed(1)}% da receita total da loja.`
-      : revenueShare > 0
-        ? ` Representa ${revenueShare.toFixed(1)}% da receita do lote.`
-        : "";
-
-  if (deliveryRate > 50 || (cancelRate < 15 && deliveryRate >= 0)) {
-    if (cancelRate < 15 && deliveryRate > 50) {
-      const timingHint =
-        peakDay && peakHour !== undefined
-          ? ` Pico de compra: ${peakDay} às ${peakHour}h.`
-          : "";
-      return `Grupo saudável! Pagamento via ${payment} com ${deliveryRate.toFixed(0)}% de entrega. Ticket médio R$ ${avgFormatted}.${timingHint} Replique este padrão!`;
-    }
-    if (cancelRate < 15) {
-      const timingHint =
-        peakDay && peakHour !== undefined
-          ? ` Pico de compra: ${peakDay} às ${peakHour}h.`
-          : "";
-      return `Pedidos aguardando despacho. Pagamento via ${payment}, ticket médio R$ ${avgFormatted}.${shareText}${timingHint} Priorize a separação para garantir entrega.`;
-    }
-  }
 
   if (cancelRate >= 50) {
-    if (p.includes("promiss")) {
-      if (count >= 3)
-        return `Grupo crítico de Promissória: ${count} pedidos cancelados, ticket médio R$ ${avgFormatted}.${shareText} Desative este método imediatamente e contate os clientes.`;
-      if (avgValue >= 3000)
-        return `Promissória de alto ticket (R$ ${avgFormatted}) com alto cancelamento.${shareText} Bloqueie novas promissórias e priorize recuperação destes ${count} pedido(s).`;
-      return `Promissória de baixo volume (${count} pedido(s), ticket R$ ${avgFormatted}) cancelada.${shareText} Remova o método e monitore reincidência.`;
-    }
-    if (p.includes("boleto")) {
-      if (errorRate > 0)
-        return `Boletos com ${errorRate.toFixed(0)}% de erros de workflow e ${cancelRate.toFixed(0)}% de cancelamento. Ticket médio R$ ${avgFormatted}.${shareText} Corrija integração e envie PIX em 2h.`;
-      if (count >= 3)
-        return `${count} pedidos via boleto abandonados. Ticket médio R$ ${avgFormatted}.${shareText} Ative régua automática de lembrete PIX no WhatsApp.`;
-      return `Boleto isolado (${count} pedido(s), R$ ${avgFormatted}) não pago.${shareText} Envie link PIX imediatamente após emissão.`;
-    }
-    return `Cancelamento elevado (${cancelRate.toFixed(0)}%) em ${count} pedido(s). Ticket médio R$ ${avgFormatted}.${shareText} Investigue o padrão de comportamento deste grupo.`;
+    return `${cancelRate.toFixed(0)}% cancelados · ${count} pedidos · Perda estimada: R$ ${(avgValue * count * cancelRate / 100).toLocaleString("pt-BR", { minimumFractionDigits: 2 })}`;
   }
 
-  return `Grupo misto: ${deliveryRate.toFixed(0)}% de entrega, ${cancelRate.toFixed(0)}% de cancelamento. Ticket médio R$ ${avgFormatted}.${shareText} Monitore conversão e ajuste método de pagamento se necessário.`;
+  if (deliveryRate > 50) {
+    return `Ticket R$ ${avgFormatted} · ${deliveryRate.toFixed(0)}% entregues · ${revenueShare.toFixed(0)}% da receita`;
+  }
+
+  return `${count} pedidos via ${payment} · Ticket R$ ${avgFormatted} · Cancelamento ${cancelRate.toFixed(0)}%`;
 }
 
 function buildClusters(
   orders: ProcessedOrder[],
   clusterAssignments: number[],
   receitaTotal: number,
+  profiles: AnalysisResult["kprototypes"]["clusterProfiles"],
 ): ClusterInfo[] {
   const groups = new Map<number, ProcessedOrder[]>();
 
@@ -236,13 +163,11 @@ function buildClusters(
     .map(([id, groupOrders]) => {
       const count = groupOrders.length;
       const percentage = Math.round((count / orders.length) * 1000) / 10;
-
       const totalValue = groupOrders.reduce((s, o) => s + o.totalValue, 0);
       const averageValue = totalValue / count;
-      const totalRevenue = totalValue;
       const revenueShare =
         receitaTotal > 0
-          ? Math.round((totalRevenue / receitaTotal) * 1000) / 10
+          ? Math.round((totalValue / receitaTotal) * 1000) / 10
           : 0;
 
       const canceledCount = groupOrders.filter(
@@ -282,21 +207,16 @@ function buildClusters(
       const statusRaw = mostCommon(groupOrders.map((o) => o.statusRaw));
       const origin = mostCommon(groupOrders.map((o) => o.originRaw));
       const statusDisplay = STATUS_PT[statusRaw] ?? statusRaw;
-
       const deliveryRate =
-        (groupOrders.filter((o) => o.isAllDelivered === 1).length / count) *
-        100;
+        (groupOrders.filter((o) => o.isAllDelivered === 1).length / count) * 100;
 
-      const paymentMix = buildPaymentMix(groupOrders);
+      const profile = profiles.find((p) => p.clusterId === id);
       const hourDistribution = buildHourDistribution(groupOrders);
       const dayDistribution = buildDayDistribution(groupOrders);
-      const topProducts = buildTopProducts(groupOrders, 5);
-      const peakHour = findPeakHour(hourDistribution);
-      const peakDay = findPeakDay(dayDistribution);
 
       return {
         id,
-        name: generateClusterName(id, payment, deliveryRate),
+        name: profile?.name ?? `Cluster ${id}`,
         count,
         percentage,
         averageValue,
@@ -314,38 +234,20 @@ function buildClusters(
           cancelRate,
           count,
           revenueShare,
-          errorRate,
-          peakDay,
-          peakHour,
         ),
-        subtitle: generateClusterSubtitle(count, deliveryRate),
+        subtitle: profile?.description ?? `${count} pedidos identificados`,
         cancelRate,
-        totalRevenue,
+        totalRevenue: totalValue,
         revenueShare,
         errorRate,
-        paymentMix,
+        paymentMix: buildPaymentMix(groupOrders),
         hourDistribution,
         dayDistribution,
-        topProducts,
+        topProducts: buildTopProducts(groupOrders, 5),
+        profileName: profile?.name,
       };
     })
     .sort((a, b) => a.id - b.id);
-}
-
-function buildCentroids(centroids: number[][]): CentroidNormalized[] {
-  return centroids.map((c, i) => ({
-    clusterId: i,
-    name: `Cluster ${i}`,
-    valorTotal: Math.round(c[0] * 100),
-    totalItens: Math.round(c[1] * 100),
-    quantidadeTotal: Math.round(c[2] * 100),
-    precoMedio: Math.round(c[3] * 100),
-    origem: c[4] ?? 0,
-    pagamento: c[5] ?? 0,
-    horaDoDia: c[6] ?? 0,
-    diaDaSemana: c[7] ?? 0,
-    canalVendas: c[8] ?? 0,
-  }));
 }
 
 function denormalizeValue(normalized: number, min: number, max: number): number {
@@ -354,118 +256,48 @@ function denormalizeValue(normalized: number, min: number, max: number): number 
   return normalized * range + min;
 }
 
-function buildDenormalizedCentroids(
-  centroids: number[][],
-  mins: number[],
-  maxs: number[],
-  orders: ProcessedOrder[],
-): CentroidDenormalized[] {
-  const channelMap = new Map<number, string>();
-  orders.forEach((o) => {
-    if (o.salesChannel >= 0 && o.salesChannelRaw) {
-      channelMap.set(o.salesChannel, o.salesChannelRaw);
-    }
-  });
-
-  return centroids.map((c, i) => {
-    const paymentCode = Math.round(
-      denormalizeValue(c[5] ?? 0, mins[5] ?? 0, maxs[5] ?? 0),
-    );
-    const dayCode = Math.round(
-      denormalizeValue(c[7] ?? 0, mins[7] ?? 0, maxs[7] ?? 0),
-    );
-    const channelCode = Math.round(
-      denormalizeValue(c[8] ?? 0, mins[8] ?? 0, maxs[8] ?? 0),
-    );
-    const originCode = Math.round(
-      denormalizeValue(c[4] ?? 0, mins[4] ?? 0, maxs[4] ?? 0),
-    );
-
-    return {
-      clusterId: i,
-      name: `Cluster ${i}`,
-      valorTotal: Math.round(
-        denormalizeValue(c[0], mins[0], maxs[0]) * 100,
-      ) / 100,
-      totalItens:
-        Math.round(denormalizeValue(c[1], mins[1], maxs[1]) * 10) / 10,
-      quantidadeTotal:
-        Math.round(denormalizeValue(c[2], mins[2], maxs[2]) * 10) / 10,
-      precoMedio:
-        Math.round(denormalizeValue(c[3], mins[3], maxs[3]) * 100) / 100,
-      origem: originCode === 0 ? "Marketplace" : "Outro",
-      pagamento: PAYMENT_REVERSE[paymentCode] ?? "Desconhecido",
-      horaDoDia: Math.round(
-        denormalizeValue(c[6] ?? 0, mins[6] ?? 0, maxs[6] ?? 0),
-      ),
-      diaDaSemana: DAY_NAMES[Math.min(Math.max(dayCode, 0), 6)] ?? "—",
-      canalVendas: channelMap.get(channelCode) ?? `Canal ${channelCode}`,
-    };
-  });
+function buildCentroids(
+  centroids: AnalysisResult["kprototypes"]["centroids"],
+  profiles: AnalysisResult["kprototypes"]["clusterProfiles"],
+): CentroidNormalized[] {
+  return centroids.map((c, i) => ({
+    clusterId: i,
+    name: profiles[i]?.name ?? `Cluster ${i}`,
+    valorTotal: Math.round(c.numeric[0] * 100),
+    totalItens: Math.round(c.numeric[1] * 100),
+    quantidadeTotal: Math.round(c.numeric[2] * 100),
+    precoMedio: Math.round(c.numeric[3] * 100),
+    pagamento: c.categorical.paymentMethod,
+    origem: c.categorical.origin,
+    status: c.categorical.status,
+    diaDaSemana: c.categorical.dayOfWeek,
+    canalVendas: c.categorical.salesChannel,
+  }));
 }
 
-function buildSomGrid(
-  orders: ProcessedOrder[],
-  predictions: [number, number][],
-  gridX: number,
-  gridY: number,
-): SOMNeuron[] {
-  const grid: SOMNeuron[] = [];
-
-  for (let r = 0; r < gridY; r++) {
-    for (let c = 0; c < gridX; c++) {
-      const matchingOrders = orders.filter((_, i) => {
-        const pred = predictions[i];
-        return pred && pred[0] === r && pred[1] === c;
-      });
-
-      const count = matchingOrders.length;
-      const value =
-        count > 0
-          ? matchingOrders.reduce((s, o) => s + o.totalValue, 0) / count
-          : 0;
-
-      const canceledCount = matchingOrders.filter(
-        (o) => o.statusRaw === "canceled",
-      ).length;
-      const cancelRate =
-        count > 0 ? Math.round((canceledCount / count) * 1000) / 10 : 0;
-
-      const deliveredCount = matchingOrders.filter(
-        (o) => o.isAllDelivered === 1,
-      ).length;
-      const deliveryRate =
-        count > 0 ? Math.round((deliveredCount / count) * 1000) / 10 : 0;
-
-      const paymentMix = buildPaymentMix(matchingOrders);
-      const hourDistribution = buildHourDistribution(matchingOrders);
-      const dayDistribution = buildDayDistribution(matchingOrders);
-      const peakHour = count > 0 ? findPeakHour(hourDistribution) : 0;
-      const peakDay = count > 0 ? findPeakDay(dayDistribution) : "—";
-      const topProducts = buildTopProducts(matchingOrders, 3);
-
-      const label =
-        count > 0
-          ? `${count} pedido(s) neste quadrante. Ticket médio R$ ${value.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}. Cancelamento: ${cancelRate}%. Entrega: ${deliveryRate}%.`
-          : "Quadrante vazio — nenhum cliente mapeado aqui.";
-
-      grid.push({
-        row: r,
-        col: c,
-        count,
-        value,
-        label,
-        cancelRate,
-        deliveryRate,
-        paymentMix,
-        peakHour,
-        peakDay,
-        topProducts,
-      });
-    }
-  }
-
-  return grid;
+function buildDenormalizedCentroids(
+  centroids: AnalysisResult["kprototypes"]["centroids"],
+  mins: number[],
+  maxs: number[],
+  profiles: AnalysisResult["kprototypes"]["clusterProfiles"],
+): CentroidDenormalized[] {
+  return centroids.map((c, i) => ({
+    clusterId: i,
+    name: profiles[i]?.name ?? `Cluster ${i}`,
+    valorTotal:
+      Math.round(denormalizeValue(c.numeric[0], mins[0], maxs[0]) * 100) / 100,
+    totalItens:
+      Math.round(denormalizeValue(c.numeric[1], mins[1], maxs[1]) * 10) / 10,
+    quantidadeTotal:
+      Math.round(denormalizeValue(c.numeric[2], mins[2], maxs[2]) * 10) / 10,
+    precoMedio:
+      Math.round(denormalizeValue(c.numeric[3], mins[3], maxs[3]) * 100) / 100,
+    origem: c.categorical.origin,
+    pagamento: c.categorical.paymentMethod,
+    status: c.categorical.status,
+    diaDaSemana: c.categorical.dayOfWeek,
+    canalVendas: c.categorical.salesChannel,
+  }));
 }
 
 function buildStatuses(orders: ProcessedOrder[]): StatusDistribution[] {
@@ -493,6 +325,7 @@ function buildAllStrategies(
         label: a.label,
         description: a.description,
       })),
+      financialImpact: s.financialImpact,
     }));
 }
 
@@ -523,14 +356,11 @@ function getProductAction(score: number): string {
 
 function computeMedian(values: number[]): number {
   if (values.length === 0) return 0;
-
   const sorted = [...values].sort((a, b) => a - b);
   const mid = Math.floor(sorted.length / 2);
-
   if (sorted.length % 2 === 0) {
     return (sorted[mid - 1] + sorted[mid]) / 2;
   }
-
   return sorted[mid];
 }
 
@@ -539,7 +369,6 @@ function generateProductClusterName(
   medianEffectiveQty: number,
 ): string {
   if (clusterProducts.length === 0) return "Indefinido";
-
   const avgCancel =
     clusterProducts.reduce((sum, product) => sum + product.cancellationRate, 0) /
     clusterProducts.length;
@@ -606,10 +435,31 @@ function buildAnomalyProducts(
     .sort((a, b) => b.anomalyScore - a.anomalyScore);
 }
 
+function buildExecutiveSummary(
+  totalPedidos: number,
+  taxaCancelamento: number,
+  perdaEstimada: number,
+  totalClusters: number,
+): string {
+  return `${totalPedidos} pedidos · ${taxaCancelamento.toFixed(0)}% cancelados · Perda: R$ ${perdaEstimada.toLocaleString("pt-BR", { minimumFractionDigits: 2 })} · ${totalClusters} segmentos identificados`;
+}
+
 export function mapAnalysisResultToDashboard(
   result: AnalysisResult,
 ): DashboardData {
-  const { orders, kmeans, som, productKmeans, diagnostics, normalizationMeta } = result;
+  const {
+    orders,
+    kprototypes,
+    productKmeans,
+    diagnostics,
+    normalizationMeta,
+    rfm,
+    inventory,
+    alerts,
+    fraud,
+    forecast,
+    healthScore,
+  } = result;
   const { mins, maxs } = normalizationMeta;
 
   const canceledCount = orders.filter((o) => o.statusRaw === "canceled").length;
@@ -622,11 +472,17 @@ export function mapAnalysisResultToDashboard(
     totalPedidos > 0 ? (deliveredCount / totalPedidos) * 100 : 0;
   const errosWorkflow = orders.filter((o) => o.workflowInErrorState === 1).length;
   const ticketMedio = totalPedidos > 0 ? receitaTotal / totalPedidos : 0;
+  const perdaEstimada = receitaTotal * (taxaCancelamento / 100);
 
-  const clusters = buildClusters(orders, kmeans.clusters, receitaTotal);
+  const clusters = buildClusters(
+    orders,
+    kprototypes.clusters,
+    receitaTotal,
+    kprototypes.clusterProfiles,
+  );
 
-  const bestSilhouettePoint = kmeans.silhouetteAnalysis.find(
-    (p) => p.k === kmeans.bestK,
+  const bestSilhouettePoint = kprototypes.silhouetteAnalysis.find(
+    (p) => p.k === kprototypes.bestK,
   );
   const bestSilhouetteScore = bestSilhouettePoint?.score ?? 0;
 
@@ -640,8 +496,6 @@ export function mapAnalysisResultToDashboard(
     count: orders.filter((o) => o.dayOfWeek === d).length,
   }));
 
-  const statuses = buildStatuses(orders);
-
   const products = [...diagnostics.productStats]
     .sort((a, b) => b.revenue - a.revenue)
     .slice(0, 10)
@@ -650,35 +504,6 @@ export function mapAnalysisResultToDashboard(
       quantity: p.effectiveQty,
       revenue: p.revenue,
     }));
-
-  const risks: StrategicRisk[] = diagnostics.risks.map((r) => ({
-    product: r.product,
-    type: r.riskType,
-    gravity:
-      r.severity === "Alta"
-        ? "Alto"
-        : r.severity === "Média"
-          ? "Médio"
-          : "Baixo",
-  }));
-
-  const suggestions: KitSuggestion[] = diagnostics.strategies
-    .filter((s) => s.type === "KIT_OPPORTUNITY" && s.kits && s.kits.length > 0)
-    .flatMap((s) =>
-      (s.kits ?? []).map((k) => ({
-        name: k.commercialName,
-        objective: k.strategicObjective,
-        products: k.compositeItems,
-        details: k.salesRationale,
-      })),
-    );
-
-  const allStrategies = buildAllStrategies(diagnostics.strategies);
-  const clusterRisks = buildClusterRisks(clusters);
-  const productAnomalies = buildAnomalyProducts(
-    productKmeans,
-    diagnostics.productStats,
-  );
 
   const reportDate =
     orders.length > 0
@@ -695,33 +520,74 @@ export function mapAnalysisResultToDashboard(
       taxaEntrega,
       errosWorkflow,
       totalPedidos,
-      totalClusters: kmeans.bestK,
+      totalClusters: kprototypes.bestK,
+      healthScore: healthScore.overall,
+      perdaEstimada,
     },
     clusters,
-    centroids: buildCentroids(kmeans.centroids),
+    centroids: buildCentroids(kprototypes.centroids, kprototypes.clusterProfiles),
     denormalizedCentroids: buildDenormalizedCentroids(
-      kmeans.centroids,
+      kprototypes.centroids,
       mins,
       maxs,
-      orders,
+      kprototypes.clusterProfiles,
     ),
-    elbowCurve: kmeans.elbowAnalysis,
-    silhouetteCurve: kmeans.silhouetteAnalysis,
+    elbowCurve: kprototypes.elbowAnalysis,
+    silhouetteCurve: kprototypes.silhouetteAnalysis,
     bestSilhouetteScore,
-    somGrid: buildSomGrid(orders, som.predictions, som.gridX, som.gridY),
     operationalHours,
     operationalDays,
-    statuses,
+    statuses: buildStatuses(orders),
     products,
-    productAnomalies,
+    productAnomalies: buildAnomalyProducts(productKmeans, diagnostics.productStats),
     diagnostics: {
-      summary: diagnostics.diagnosis.executiveSummary,
+      summary: buildExecutiveSummary(
+        totalPedidos,
+        taxaCancelamento,
+        perdaEstimada,
+        kprototypes.bestK,
+      ),
       championProduct: diagnostics.diagnosis.championProduct,
       bottleneckProduct: diagnostics.diagnosis.bottleneckProduct,
-      risks,
-      suggestions,
-      allStrategies,
-      clusterRisks,
+      risks: diagnostics.risks.map((r) => ({
+        product: r.product,
+        type: r.riskType,
+        gravity:
+          r.severity === "Alta"
+            ? "Alto"
+            : r.severity === "Média"
+              ? "Médio"
+              : "Baixo",
+      })),
+      suggestions: diagnostics.strategies
+        .filter((s) => s.type === "KIT_OPPORTUNITY" && s.kits && s.kits.length > 0)
+        .flatMap((s) =>
+          (s.kits ?? []).map((k) => ({
+            name: k.commercialName,
+            objective: k.strategicObjective,
+            products: k.compositeItems,
+            details: k.salesRationale,
+          })),
+        ),
+      allStrategies: buildAllStrategies(diagnostics.strategies),
+      clusterRisks: buildClusterRisks(clusters),
+    },
+    rfm: {
+      segments: rfm.segments,
+      recommendations: rfm.recommendations,
+      totalClients: rfm.clients.length,
+    },
+    inventory: {
+      ruptureRisk: inventory.ruptureRisk,
+      deadStock: inventory.deadStock,
+      abcCurve: inventory.abcCurve,
+    },
+    alerts,
+    fraud,
+    forecast,
+    healthScore: {
+      ...healthScore,
+      label: getHealthLabel(healthScore.overall),
     },
   };
 }

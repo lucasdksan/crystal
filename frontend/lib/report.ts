@@ -185,13 +185,13 @@ export function buildHtmlReport(data: DashboardData): string {
   ${
     suspiciousProducts.length > 0
       ? `<div class="section">
-    <h2>Produtos que Requerem Atenção (Score &gt;= 50)</h2>
+    <h2>Produtos que Requerem Atenção</h2>
     <table>
       <thead>
         <tr>
           <th>Produto</th>
           <th class="right">Receita Cancelada</th>
-          <th class="center">Score</th>
+          <th class="center">Nível de Risco</th>
           <th>Cancelamento</th>
           <th>Recomendação</th>
         </tr>

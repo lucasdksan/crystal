@@ -12,7 +12,7 @@ function normalizeOrderMonetaryValues(order: VtexOrder): VtexOrder {
   return {
     ...order,
     totalValue: centsToCurrency(order.totalValue),
-    items: order.items.map((item) => ({
+    items: (order.items ?? []).map((item) => ({
       ...item,
       price: centsToCurrency(item.price),
       sellingPrice: centsToCurrency(item.sellingPrice),

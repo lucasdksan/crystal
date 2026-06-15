@@ -1,4 +1,3 @@
-/** Converte data do calendário (YYYY-MM-DD) para ISO no formato esperado pela VTEX OMS. */
 export function calendarDateToVtexIso(
   dateStr: string,
   boundary: "start" | "end",
@@ -15,7 +14,6 @@ export function calendarDateToVtexIso(
   return new Date(Date.UTC(year, month - 1, day, 23, 59, 59, 999)).toISOString();
 }
 
-/** Formata YYYY-MM-DD para exibição pt-BR (dd/mm/aaaa). */
 export function formatCalendarDatePtBr(dateStr: string): string {
   const [year, month, day] = dateStr.split("-");
   if (!year || !month || !day) return dateStr;

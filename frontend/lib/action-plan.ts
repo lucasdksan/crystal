@@ -1,10 +1,6 @@
-export type HealthState = "critical" | "warning" | "healthy" | "simulation";
+export type HealthState = "critical" | "warning" | "healthy";
 
-export function getHealthState(
-  taxaCancelamento: number,
-  isSimulation: boolean,
-): HealthState {
-  if (isSimulation) return "simulation";
+export function getHealthState(taxaCancelamento: number): HealthState {
   if (taxaCancelamento > 50) return "critical";
   if (taxaCancelamento < 15) return "healthy";
   return "warning";
@@ -15,15 +11,12 @@ export const EXECUTIVE_TITLES: Record<HealthState, string> = {
     "Sua Loja possui uma Ilusão de Caixa e Carga Logística Estéril.",
   warning: "Sua Loja opera com Alto Risco de Receita. Corrija agora.",
   healthy: "Sua Loja está Saudável. Continue escalando com inteligência.",
-  simulation:
-    "Cenário ilustrativo — meta de 15% de cancelamento (dados fictícios).",
 };
 
 export const ACTION_PLAN_HEADERS: Record<HealthState, string> = {
   critical: "Prioridades para Sair do Abismo",
   warning: "Ações Urgentes para Estabilizar Receita",
   healthy: "Próximos Passos para Escalar",
-  simulation: "Manter o Momentum Pós-Correção",
 };
 
 export const ACTION_PLAN_ITEMS: Record<
@@ -55,7 +48,7 @@ export const ACTION_PLAN_ITEMS: Record<
       num: "1",
       color: "rose",
       title: "Auditar Métodos de Pagamento Frágeis",
-      desc: "Identifique clusters com cancelamento acima de 30% e restrinja métodos problemáticos.",
+      desc: "Identifique grupos com cancelamento acima de 30% e restrinja métodos problemáticos.",
     },
     {
       num: "2",
@@ -67,7 +60,7 @@ export const ACTION_PLAN_ITEMS: Record<
       num: "3",
       color: "emerald",
       title: "Replicar Padrão dos Grupos Saudáveis",
-      desc: "Analise os clusters com alta conversão e incentive o mesmo perfil de compra.",
+      desc: "Analise os grupos com alta conversão e incentive o mesmo perfil de compra.",
     },
   ],
   healthy: [
@@ -90,26 +83,6 @@ export const ACTION_PLAN_ITEMS: Record<
       desc: "Revise as Perdas Identificadas toda semana para recuperar receita em risco.",
     },
   ],
-  simulation: [
-    {
-      num: "1",
-      color: "emerald",
-      title: "Consolidar Desativação de Promissórias",
-      desc: "Mantenha promissórias bloqueadas — a simulação provou o ganho de 45% no lucro líquido.",
-    },
-    {
-      num: "2",
-      color: "indigo",
-      title: "Automatizar Conversão PIX",
-      desc: "Implemente cupom PIX automático para os 85% de faturamentos pendentes convertidos.",
-    },
-    {
-      num: "3",
-      color: "blue",
-      title: "Escalar Campanhas de Fidelização",
-      desc: "Invista em retenção dos grupos saudáveis com promoções segmentadas.",
-    },
-  ],
 };
 
 export const ACTION_PLAN_FOOTNOTES: Record<HealthState, string> = {
@@ -119,8 +92,6 @@ export const ACTION_PLAN_FOOTNOTES: Record<HealthState, string> = {
     "*Dados reais: cada ponto percentual de cancelamento reduzido representa receita líquida recuperada imediatamente.",
   healthy:
     "*Parabéns! Sua taxa de cancelamento está abaixo de 15% — foco agora em crescimento e retenção.",
-  simulation:
-    "*Cenário ilustrativo: estes dados são fictícios e não refletem predição real da sua loja.",
 };
 
 export const actionPlanColorClasses: Record<

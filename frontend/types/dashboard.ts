@@ -6,6 +6,8 @@ export interface OverviewStats {
   errosWorkflow: number;
   totalPedidos: number;
   totalClusters: number;
+  healthScore: number;
+  perdaEstimada: number;
 }
 
 export interface ProductRank {
@@ -37,6 +39,7 @@ export interface ClusterInfo {
   hourDistribution: number[];
   dayDistribution: number[];
   topProducts: ProductRank[];
+  profileName?: string;
 }
 
 export interface CentroidNormalized {
@@ -46,11 +49,11 @@ export interface CentroidNormalized {
   totalItens: number;
   quantidadeTotal: number;
   precoMedio: number;
-  origem: number;
-  pagamento: number;
-  horaDoDia: number;
-  diaDaSemana: number;
-  canalVendas: number;
+  pagamento: string;
+  origem: string;
+  status: string;
+  diaDaSemana: string;
+  canalVendas: string;
 }
 
 export interface CentroidDenormalized {
@@ -62,7 +65,7 @@ export interface CentroidDenormalized {
   precoMedio: number;
   origem: string;
   pagamento: string;
-  horaDoDia: number;
+  status: string;
   diaDaSemana: string;
   canalVendas: string;
 }
@@ -75,20 +78,6 @@ export interface ElbowPoint {
 export interface SilhouettePoint {
   k: number;
   score: number;
-}
-
-export interface SOMNeuron {
-  row: number;
-  col: number;
-  count: number;
-  value: number;
-  label: string;
-  cancelRate: number;
-  deliveryRate: number;
-  paymentMix: Record<string, number>;
-  peakHour: number;
-  peakDay: string;
-  topProducts: ProductRank[];
 }
 
 export interface OperationalHour {
@@ -125,12 +114,23 @@ export interface StrategyAction {
   description: string;
 }
 
+export interface FinancialImpactInfo {
+  problem: string;
+  estimatedLoss: number;
+  recommendedAction: string;
+  estimatedRecovery: number;
+  estimatedCost: number;
+  roi: number;
+  priority: "alta" | "media" | "baixa";
+}
+
 export interface StrategyInfo {
   type: string;
   label: string;
   priorityScore: number;
   justifications: string[];
   actions: StrategyAction[];
+  financialImpact?: FinancialImpactInfo;
 }
 
 export interface ClusterRisk {
@@ -163,6 +163,125 @@ export interface StrategicDiagnostics {
   clusterRisks: ClusterRisk[];
 }
 
+export interface RFMSegmentInfo {
+  name: string;
+  count: number;
+  revenue: number;
+  avgRecency: number;
+  avgFrequency: number;
+  avgMonetary: number;
+}
+
+export interface RFMRecommendationInfo {
+  segment: string;
+  action: string;
+  clientCount: number;
+  revenue: number;
+}
+
+export interface RFMDashboard {
+  segments: RFMSegmentInfo[];
+  recommendations: RFMRecommendationInfo[];
+  totalClients: number;
+}
+
+export interface RuptureRiskInfo {
+  skuId: string;
+  name: string;
+  currentStock: number;
+  avgDailySales: number;
+  daysRemaining: number;
+  classification: "Crítico" | "Atenção" | "Saudável";
+}
+
+export interface DeadStockInfo {
+  skuId: string;
+  name: string;
+  daysSinceLastSale: number;
+  currentStock: number;
+}
+
+export interface ABCItemInfo {
+  skuId: string;
+  name: string;
+  class: "A" | "B" | "C";
+  revenue: number;
+  cumulativeRevenue: number;
+  share: number;
+  cumulativeShare: number;
+}
+
+export interface InventoryDashboard {
+  ruptureRisk: RuptureRiskInfo[];
+  deadStock: DeadStockInfo[];
+  abcCurve: ABCItemInfo[];
+}
+
+export interface AlertInfo {
+  id: string;
+  severity: "critical" | "warning" | "info";
+  category: string;
+  title: string;
+  description: string;
+  financialImpact: number;
+  recommendedAction: string;
+  confidence: number;
+  createdAt: string;
+  financialDetails?: FinancialImpactInfo;
+}
+
+export interface FraudFlagInfo {
+  orderId: string;
+  clientId: string;
+  score: number;
+  riskLevel: "low" | "medium" | "high";
+  reasons: string[];
+}
+
+export interface FraudDashboard {
+  flaggedOrders: FraudFlagInfo[];
+  summary: {
+    totalFlagged: number;
+    estimatedExposure: number;
+    highRisk: number;
+    mediumRisk: number;
+    lowRisk: number;
+  };
+}
+
+export interface SKUForecastInfo {
+  skuId: string;
+  name: string;
+  trend: "growing" | "stable" | "declining";
+  forecast7d: number;
+  forecast30d: number;
+  forecast90d: number;
+  expectedGrowth: number;
+}
+
+export interface PurchaseRecommendationInfo {
+  skuId: string;
+  name: string;
+  recommendedQty: number;
+  reason: string;
+  urgency: "alta" | "media" | "baixa";
+}
+
+export interface ForecastDashboard {
+  forecasts: SKUForecastInfo[];
+  purchaseRecommendations: PurchaseRecommendationInfo[];
+}
+
+export interface HealthScoreInfo {
+  overall: number;
+  cancellation: number;
+  delivery: number;
+  inventory: number;
+  revenueConcentration: number;
+  fraud: number;
+  label: string;
+}
+
 export interface DashboardData {
   reportDate: string;
   reportId: string;
@@ -173,13 +292,18 @@ export interface DashboardData {
   elbowCurve: ElbowPoint[];
   silhouetteCurve: SilhouettePoint[];
   bestSilhouetteScore: number;
-  somGrid: SOMNeuron[];
   operationalHours: OperationalHour[];
   operationalDays: OperationalDay[];
   statuses: StatusDistribution[];
   products: ProductRank[];
   productAnomalies: AnomalyProduct[];
   diagnostics: StrategicDiagnostics;
+  rfm: RFMDashboard;
+  inventory: InventoryDashboard;
+  alerts: AlertInfo[];
+  fraud: FraudDashboard;
+  forecast: ForecastDashboard;
+  healthScore: HealthScoreInfo;
 }
 
 export interface ChatMessage {
@@ -188,3 +312,13 @@ export interface ChatMessage {
   text: string;
   timestamp: string;
 }
+
+export type DashboardTabId =
+  | "resumo"
+  | "clientes"
+  | "relacionamento"
+  | "estoque"
+  | "alertas"
+  | "riscos"
+  | "oportunidades"
+  | "mentor";

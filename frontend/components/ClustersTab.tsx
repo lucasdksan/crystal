@@ -4,7 +4,6 @@ import React, { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import type { DashboardData } from "@/frontend/types/dashboard";
 import {
-  HelpCircle,
   ChevronRight,
   Info,
   CheckCircle2,
@@ -14,13 +13,10 @@ import {
   Banknote,
 } from "lucide-react";
 import {
-  LineChart,
-  Line,
   XAxis,
   YAxis,
   Tooltip,
   CartesianGrid,
-  ReferenceDot,
   BarChart,
   Bar,
   Cell,
@@ -37,7 +33,6 @@ export function ClustersTab({ data }: ClustersTabProps) {
   const [selectedClusterId, setSelectedClusterId] = useState<number | null>(
     null,
   );
-  const [showExplanation, setShowExplanation] = useState(false);
 
   const getPaymentIcon = (payment: string) => {
     const p = payment.toLowerCase();
@@ -79,8 +74,6 @@ export function ClustersTab({ data }: ClustersTabProps) {
     (c) => c.clusterId === selectedClusterId,
   );
 
-  const bestK = data.overview.totalClusters;
-
   const hourChartData =
     currentSelectedCluster?.hourDistribution.map((count, hour) => ({
       hour: `${hour}h`,
@@ -95,7 +88,7 @@ export function ClustersTab({ data }: ClustersTabProps) {
 
   return (
     <div className="space-y-8 animate-fade-in">
-      <div className="bg-gradient-to-r from-blue-50 to-indigo-50/40 rounded-2xl p-6 border border-blue-100 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+      <div className="bg-gradient-to-r from-blue-50 to-indigo-50/40 rounded-2xl p-6 border border-blue-100">
         <div className="space-y-1">
           <h2 className="text-xl font-sans font-bold text-slate-900 flex items-center gap-2">
             🔬 Entendendo os Seus Grupos de Clientes
@@ -104,206 +97,11 @@ export function ClustersTab({ data }: ClustersTabProps) {
             Com base em Inteligência de Dados, agrupamos seus{" "}
             <strong>{data.overview.totalPedidos} pedidos</strong> em{" "}
             <strong>{data.overview.totalClusters} perfis distintos</strong> de
-            comportamento com <em>segmentação inteligente</em>. O número ideal de
-            grupos foi
-            escolhido pelo <strong>score de silhueta</strong> (
-            {data.bestSilhouetteScore.toFixed(3)}).
+            comportamento — clientes com padrões parecidos de compra, pagamento
+            e horário.
           </p>
         </div>
-        <button
-          onClick={() => setShowExplanation(!showExplanation)}
-          className="flex items-center gap-2 px-4 py-2 bg-white rounded-xl border border-slate-200 shadow-xs hover:bg-slate-50 transition-colors text-slate-700 font-sans text-sm font-medium cursor-pointer"
-        >
-          <HelpCircle className="w-4 h-4 text-indigo-500" />
-          {showExplanation ? "Ocultar Explicação" : "Como funciona a segmentação?"}
-        </button>
       </div>
-
-      <AnimatePresence>
-        {showExplanation && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            className="overflow-hidden"
-          >
-            <div className="bg-white rounded-2xl border border-slate-100 p-6 space-y-4 grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
-              <div className="space-y-3">
-                <h3 className="font-bold text-slate-900 font-sans text-base flex items-center gap-2">
-                  <Info className="w-5 h-5 text-indigo-500" />
-                  Como funcionam esses Grupos?
-                </h3>
-                <p className="text-sm text-slate-600 font-sans leading-relaxed">
-                  Imagine que você tem centenas de clientes na loja e não dá
-                  tempo de atender um por um de forma diferente.{" "}
-                  A <strong>segmentação inteligente</strong> analisa a receita, o
-                  número de produtos, o pagamento
-                  utilizado e o horário e, de forma mágica, &quot;empilha&quot; pessoas
-                  com comportamentos muito parecidos em gavetas (os chamados{" "}
-                  <em>Clusters</em>).
-                </p>
-                <div className="flex gap-2">
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex-1">
-                    <span className="block text-xs font-semibold text-slate-700">
-                      Score de Silhueta
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Mede o quão bem cada pedido se encaixa no seu grupo. Quanto
-                      mais próximo de 1, melhor a segmentação. É o critério usado
-                      para escolher o K ideal.
-                    </span>
-                  </div>
-                  <div className="bg-slate-50 p-2.5 rounded-lg border border-slate-100 flex-1">
-                    <span className="block text-xs font-semibold text-slate-700">
-                      Curva de Cotovelo (WCSS)
-                    </span>
-                    <span className="text-xs text-slate-500">
-                      Gráfico complementar que mostra a dispersão interna dos
-                      grupos. Útil para visualizar, mas o K final é definido
-                      pela silhueta.
-                    </span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-4">
-                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-slate-700 mb-2 font-mono flex items-center gap-1.5 self-start">
-                    📈 Score de Silhueta por K (critério de seleção)
-                  </span>
-                  <ChartContainer height={160}>
-                    <LineChart
-                      data={data.silhouetteCurve}
-                      margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#f1f5f9"
-                      />
-                      <XAxis
-                        dataKey="k"
-                        stroke="#94a3b8"
-                        fontSize={11}
-                        label={{
-                          value: "Nº Grupos (K)",
-                          position: "insideBottom",
-                          offset: -5,
-                          fill: "#64748b",
-                        }}
-                      />
-                      <YAxis stroke="#94a3b8" fontSize={11} domain={[0, 1]} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-slate-900 text-white p-2 rounded-lg text-xs font-sans">
-                                <p className="font-semibold">
-                                  K = {payload[0].payload.k} grupos
-                                </p>
-                                <p className="opacity-80">
-                                  Silhueta:{" "}
-                                  {payload[0].payload.score.toFixed(3)}
-                                </p>
-                                {payload[0].payload.k === bestK && (
-                                  <p className="text-emerald-400 font-bold mt-1">
-                                    ✓ K Selecionado!
-                                  </p>
-                                )}
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="score"
-                        stroke="#10b981"
-                        strokeWidth={2.5}
-                        dot={{ r: 4, stroke: "#10b981", strokeWidth: 1 }}
-                        activeDot={{ r: 7 }}
-                      />
-                      <ReferenceDot
-                        x={bestK}
-                        y={
-                          data.silhouetteCurve.find((p) => p.k === bestK)
-                            ?.score ?? 0
-                        }
-                        r={8}
-                        fill="#10b981"
-                        stroke="#ffffff"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                  <p className="text-[11px] text-slate-500 font-sans mt-2 text-center">
-                    K={bestK} selecionado com score{" "}
-                    <strong>{data.bestSilhouetteScore.toFixed(3)}</strong> — melhor
-                    equilíbrio entre coesão e separação dos grupos.
-                  </p>
-                </div>
-
-                <div className="bg-slate-50/50 rounded-xl p-4 border border-slate-100 flex flex-col items-center">
-                  <span className="text-xs font-semibold text-slate-700 mb-2 font-mono flex items-center gap-1.5 self-start">
-                    🔍 Curva de Cotovelo (WCSS — complementar)
-                  </span>
-                  <ChartContainer height={160}>
-                    <LineChart
-                      data={data.elbowCurve}
-                      margin={{ top: 5, right: 10, left: -20, bottom: 5 }}
-                    >
-                      <CartesianGrid
-                        strokeDasharray="3 3"
-                        vertical={false}
-                        stroke="#f1f5f9"
-                      />
-                      <XAxis
-                        dataKey="k"
-                        stroke="#94a3b8"
-                        fontSize={11}
-                      />
-                      <YAxis stroke="#94a3b8" fontSize={11} />
-                      <Tooltip
-                        content={({ active, payload }) => {
-                          if (active && payload && payload.length) {
-                            return (
-                              <div className="bg-slate-900 text-white p-2 rounded-lg text-xs font-sans">
-                                <p className="font-semibold">
-                                  K = {payload[0].payload.k} grupos
-                                </p>
-                                <p className="opacity-80">
-                                  Dispersão:{" "}
-                                  {payload[0].payload.wcss.toFixed(2)}
-                                </p>
-                              </div>
-                            );
-                          }
-                          return null;
-                        }}
-                      />
-                      <Line
-                        type="monotone"
-                        dataKey="wcss"
-                        stroke="#4f46e5"
-                        strokeWidth={2}
-                        dot={{ r: 3, stroke: "#4f46e5", strokeWidth: 1 }}
-                      />
-                      <ReferenceDot
-                        x={bestK}
-                        r={6}
-                        fill="#6366f1"
-                        stroke="#ffffff"
-                        strokeWidth={2}
-                      />
-                    </LineChart>
-                  </ChartContainer>
-                </div>
-              </div>
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         <div className="lg:col-span-2 space-y-4">
@@ -524,7 +322,7 @@ export function ClustersTab({ data }: ClustersTabProps) {
                   {currentDenormalizedCentroid && (
                     <div className="space-y-2 bg-indigo-50/50 p-4 rounded-2xl border border-indigo-100">
                       <span className="text-xs font-bold text-indigo-700 block uppercase tracking-wide">
-                        Perfil Prototípico (Centróide)
+                        Perfil Típico do Grupo
                       </span>
                       <div className="grid grid-cols-2 gap-2 text-xs font-sans">
                         <div>
@@ -548,10 +346,10 @@ export function ClustersTab({ data }: ClustersTabProps) {
                         </div>
                         <div>
                           <span className="text-slate-400 block text-[10px]">
-                            Hora Típica
+                            Status Típico
                           </span>
                           <span className="font-bold text-slate-800">
-                            {currentDenormalizedCentroid.horaDoDia}h
+                            {currentDenormalizedCentroid.status}
                           </span>
                         </div>
                         <div>
@@ -736,7 +534,7 @@ export function ClustersTab({ data }: ClustersTabProps) {
                   Selecione um Grupo
                 </h4>
                 <p className="text-xs text-slate-500 max-w-[200px] mt-2 leading-relaxed">
-                  Clique em um dos perfis de cluster da tabela à esquerda para
+                  Clique em um dos perfis da tabela à esquerda para
                   visualizar mais detalhes e conselhos comerciais.
                 </p>
               </div>

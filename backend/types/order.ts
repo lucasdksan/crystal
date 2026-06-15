@@ -10,6 +10,7 @@ export interface ProcessedOrderItem {
 export interface ProcessedOrder {
   orderId: string;
   clientName: string;
+  clientId: string;
   creationDate: string;
   items: ProcessedOrderItem[];
   totalValue: number;
@@ -39,3 +40,16 @@ export type FeatureVector = [
   number,
   number,
 ];
+
+export interface MixedDataPoint {
+  numeric: [number, number, number, number];
+  categorical: {
+    paymentMethod: string;
+    origin: string;
+    salesChannel: string;
+    status: string;
+    dayOfWeek: string;
+  };
+}
+
+export const DAY_NAMES = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"] as const;

@@ -202,7 +202,7 @@ export function AnomalyTab({ data }: AnomalyTabProps) {
                 <div className="bg-slate-950/50 p-5 rounded-2xl border border-slate-800 space-y-4">
                   <div>
                     <h3 className="text-sm font-bold text-slate-200">
-                      Receita Cancelada por Cluster
+                      Receita Cancelada por Grupo
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       Quais grupos de produtos concentram mais perda
@@ -259,7 +259,7 @@ export function AnomalyTab({ data }: AnomalyTabProps) {
                 <div className="bg-slate-950/50 p-5 rounded-2xl border border-slate-800 space-y-4">
                   <div>
                     <h3 className="text-sm font-bold text-slate-200">
-                      Taxa de Cancelamento por Cluster
+                      Taxa de Cancelamento por Grupo
                     </h3>
                     <p className="text-[11px] text-slate-500 mt-0.5">
                       Média de cancelamento em cada grupo de produtos
@@ -330,7 +330,7 @@ export function AnomalyTab({ data }: AnomalyTabProps) {
                       <tr className="bg-slate-950/80 text-slate-400 uppercase tracking-wider text-[10px]">
                         <th className="px-4 py-3 font-bold">#</th>
                         <th className="px-4 py-3 font-bold">Produto</th>
-                        <th className="px-4 py-3 font-bold">Cluster</th>
+                        <th className="px-4 py-3 font-bold">Grupo</th>
                         <th className="px-4 py-3 font-bold">Cancelamentos</th>
                         <th className="px-4 py-3 font-bold">
                           Receita Cancelada
@@ -352,7 +352,7 @@ export function AnomalyTab({ data }: AnomalyTabProps) {
                             {product.name}
                           </td>
                           <td className="px-4 py-3 text-slate-300 max-w-[140px] truncate">
-                            {product.clusterName}
+                            {product.clusterName.replace(/^Cluster /, "Grupo ")}
                           </td>
                           <td className="px-4 py-3 text-slate-300">
                             {product.totalOrders}

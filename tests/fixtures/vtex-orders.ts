@@ -28,7 +28,6 @@ function createOrder(
   };
 }
 
-/** Pedidos VTEX em centavos, como retornados pela API antes da normalização monetária. */
 export const fixtureVtexOrdersRaw: VtexOrder[] = [
   createOrder({
     orderId: "order-001",
@@ -181,12 +180,11 @@ export const fixtureVtexOrdersRaw: VtexOrder[] = [
   }),
 ];
 
-/** Pedidos já convertidos de centavos para reais (pós fetchVtexOrders). */
 export function fixtureVtexOrdersNormalized(): VtexOrder[] {
   return fixtureVtexOrdersRaw.map((order) => ({
     ...order,
     totalValue: order.totalValue / 100,
-    items: order.items.map((item) => ({
+    items: (order.items ?? []).map((item) => ({
       ...item,
       price: item.price / 100,
       sellingPrice: item.sellingPrice / 100,

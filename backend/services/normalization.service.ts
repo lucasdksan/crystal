@@ -1,5 +1,6 @@
 import type { VtexOrder } from "@/backend/types/vtex";
-import type { FeatureVector, ProcessedOrder } from "@/backend/types/order";
+import type { FeatureVector, MixedDataPoint, ProcessedOrder } from "@/backend/types/order";
+import { DAY_NAMES } from "@/backend/types/order";
 
 const ORIGIN_MAP: Record<string, number> = {
   Marketplace: 0,
@@ -55,8 +56,9 @@ export function processOrders(list: VtexOrder[]): ProcessedOrder[] {
     return {
       orderId: order.orderId,
       clientName: order.clientName,
+      clientId: order.clientEmail?.trim() || order.clientName.trim() || order.orderId,
       creationDate: order.creationDate,
-      items: order.items.map((item) => ({
+      items: (order.items ?? []).map((item) => ({
         quantity: item.quantity,
         price: item.price,
         sellingPrice: item.sellingPrice,
@@ -134,6 +136,59 @@ export function normalize(vectors: number[][]): {
       return (value - mins[i]) / range;
     }),
   );
+
+  return { normalized, mins, maxs };
+}
+
+export function buildMixedDataPoints(orders: ProcessedOrder[]): MixedDataPoint[] {
+  return orders.map((order) => {
+    const totalQuantity = order.items.reduce((acc, item) => acc + item.quantity, 0);
+    const avgPrice =
+      order.items.length > 0
+        ? order.items.reduce((acc, item) => acc + item.sellingPrice, 0) /
+          order.items.length
+        : 0;
+
+    return {
+      numeric: [order.totalValue, order.totalItems, totalQuantity, avgPrice],
+      categorical: {
+        paymentMethod: order.paymentRaw || "Desconhecido",
+        origin: order.originRaw || "Desconhecido",
+        salesChannel: order.salesChannelRaw || "Desconhecido",
+        status: order.statusRaw || "Desconhecido",
+        dayOfWeek: DAY_NAMES[order.dayOfWeek] ?? "Desconhecido",
+      },
+    };
+  });
+}
+
+export function normalizeMixedData(data: MixedDataPoint[]): {
+  normalized: MixedDataPoint[];
+  mins: number[];
+  maxs: number[];
+} {
+  if (data.length === 0) {
+    return { normalized: [], mins: [], maxs: [] };
+  }
+
+  const cols = 4;
+  const mins = Array(cols).fill(Infinity);
+  const maxs = Array(cols).fill(-Infinity);
+
+  data.forEach((point) => {
+    point.numeric.forEach((value, i) => {
+      mins[i] = Math.min(mins[i], value);
+      maxs[i] = Math.max(maxs[i], value);
+    });
+  });
+
+  const normalized = data.map((point) => ({
+    numeric: point.numeric.map((value, i) => {
+      const range = maxs[i] - mins[i];
+      return range === 0 ? 0 : (value - mins[i]) / range;
+    }) as [number, number, number, number],
+    categorical: { ...point.categorical },
+  }));
 
   return { normalized, mins, maxs };
 }

@@ -272,10 +272,10 @@ export function DiagnosticsTab({ data }: DiagnosticsTabProps) {
         <div className="space-y-4">
           <div>
             <h3 className="text-base font-bold text-slate-900 font-sans">
-              📋 Estratégias Prioritárias (Diagnostics)
+              📋 Estratégias Prioritárias
             </h3>
             <p className="text-xs text-slate-500">
-              Recomendações cruzadas com dados de clusters e portfólio
+              Recomendações cruzadas com grupos de clientes e portfólio
             </p>
           </div>
           <div className="space-y-4">
